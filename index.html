@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smile Zone Health Panel</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        chat: {
+                            bg: '#EFEAE2',
+                            outgoing: '#D9FDD3',
+                            incoming: '#FFFFFF',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- SheetJS (XLSX) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            background-color: #F8FAFC;
+        }
+
+        #root {
+            height: 100%;
+        }
+
+        /* Özel Scrollbar Tasarımı */
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .stat-card { transition: all 0.2s ease-in-out; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        
+        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .blur-content { filter: blur(5px); pointer-events: none; user-select: none; }
+
+        .chat-bg {
+            background-color: #e5e7eb;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        /* Loading / Processing Animations */
+        @keyframes fillUp { 0% { height: 0%; } 100% { height: 100%; } }
+        @keyframes dash { to { stroke-dashoffset: 0; } }
+        @keyframes progressBar { 0% { width: 0%; } 100% { width: 100%; } }
+
+        /* --- 3D SCATTER CUBE ANIMATION --- */
+        .scene-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            perspective: 800px;
+            width: 100%;
+            height: 100%;
+            min-height: 200px;
+        }
+        .cube-group {
+            position: relative;
+            width: 0;
+            height: 0;
+            transform-style: preserve-3d;
+            animation: rotateGroup 10s linear infinite;
+        }
+        @keyframes rotateGroup {
+            from { transform: rotateY(0deg) rotateX(20deg); }
+            to { transform: rotateY(360deg) rotateX(20deg); }
+        }
+        .voxel {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            transform-style: preserve-3d;
+            /* Start Position: Grid layout based on CSS vars */
+            transform: translate3d(calc(var(--x) * 14px), calc(var(--y) * 14px), calc(var(--z) * 14px));
+            animation: explode 5s ease-in-out infinite;
+        }
+        /* Cube Faces */
+        .face {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background-color: #0ea5e9; /* brand-500 */
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 3px; /* Hafif yuvarlak hat */
+            opacity: 0.85;
+            backface-visibility: hidden;
+        }
+        /* Top face lighter, bottom darker for simple shading */
+        .face.top { background-color: #38bdf8; } 
+        .face.bottom { background-color: #0284c7; }
+
+        .face.front  { transform: translateZ(7px); }
+        .face.back   { transform: rotateY(180deg) translateZ(7px); }
+        .face.right  { transform: rotateY(90deg) translateZ(7px); }
+        .face.left   { transform: rotateY(-90deg) translateZ(7px); }
+        .face.top    { transform: rotateX(90deg) translateZ(7px); }
+        .face.bottom { transform: rotateX(-90deg) translateZ(7px); }
+
+        @keyframes explode {
+            0%, 45% {
+                /* Assembled state */
+                transform: translate3d(calc(var(--x) * 14px), calc(var(--y) * 14px), calc(var(--z) * 14px));
+                opacity: 1;
+            }
+            50% {
+                /* Anticipation / Shake */
+                transform: translate3d(calc(var(--x) * 14.5px), calc(var(--y) * 14.5px), calc(var(--z) * 14.5px)) rotate(2deg);
+            }
+            70% {
+                /* Explode and Fall */
+                transform: translate3d(calc(var(--dx) * 1px), calc(var(--dy) * 1px), calc(var(--dz) * 1px)) rotateX(calc(var(--rx) * 1deg)) rotateY(calc(var(--ry) * 1deg));
+                opacity: 0.8;
+            }
+            85%, 100% {
+                /* Fade out on floor */
+                transform: translate3d(calc(var(--dx) * 1.5px), calc(var(--dy) * 1.5px), calc(var(--dz) * 1.5px)) rotateX(calc(var(--rx) * 1deg));
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // --- CONFIGURATION ---
+        const WEBHOOK_URL = "https://8ixs09rp.rpcld.app/webhook/leads-upload";
+        const DELETE_WEBHOOK_URL = "https://8ixs09rp.rpcld.app/webhook/leads-delete"; 
+        const SENDER_WEBHOOK_URL = "https://8ixs09rp.rpcld.app/webhook/toplu";
+        // Messenger Webhook'ları
+        const SEND_MESSAGE_WEBHOOK = "https://8ixs09rp.rpcld.app/webhook/manuel-outbound";
+        const TOGGLE_AI_WEBHOOK = "https://8ixs09rp.rpcld.app/webhook/toggle-ai";
+
+        const SUPABASE_URL = "https://qzvrktwfwragkqnxktpk.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dnJrdHdmd3JhZ2txbnhrdHBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjgwNTQsImV4cCI6MjA3OTc0NDA1NH0.iAzrWjs-IWZ2eoaAfmOL5XSSimUWRxXEkg225xGIt2U";
+        
+        // Tablo İsimleri
+        const TABLE_NAME = "raw_imports";
+        const LEADS_TABLE_NAME = "leads"; 
+        const MESSAGES_TABLE = "conversations"; 
+        const ACTIVE_CHATS_TABLE = "active_chats"; 
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- TRANSLATIONS ---
+        const TRANSLATIONS = {
+            tr: {
+                loginTitle: "Giriş Yap",
+                username: "Kullanıcı Adı",
+                password: "Şifre",
+                loginBtn: "Giriş Yap",
+                invalidLogin: "Geçersiz kullanıcı adı veya şifre",
+                usernamePlaceholder: "Kullanıcı adınızı girin",
+                passwordPlaceholder: "••••••",
+                
+                menuLeads: "Veri Yükleme",
+                menuSender: "Mesaj Gönderici",
+                menuMessenger: "Messenger",
+                loggedInAs: "Giriş Yapan",
+                logout: "Çıkış Yap",
+                
+                pageTitle: "Veri Yükleme",
+                pageSubtitle: "Toplu müşteri verisi yükleme ve takip paneli.",
+                downloadTemplate: "Şablon İndir",
+                templateDownloaded: "Şablon başarıyla indirildi!",
+                templateError: "Şablon oluşturulamadı.",
+                filterUser: "Kullanıcı Filtrele",
+                allUsers: "Tüm Kullanıcılar",
+                dashboardStats: "Panel İstatistikleri",
+                statTotal: "Toplam",
+                statSuccess: "Başarılı",
+                statExist: "Mevcut",
+                statDuplicate: "Tekrar",
+                statError: "Hata",
+                uploadTitle: "Dosya Yükle",
+                labelUser: "Kullanıcı Adı",
+                labelUserPlaceholder: "Kim yüklüyor?",
+                labelCampaign: "Kampanya Adı",
+                labelCampaignOptional: "(İsteğe bağlı)",
+                labelCampaignPlaceholder: "Örn: Yaz Kampanyası 2025",
+                dropText: "Dosyayı buraya sürükleyin",
+                dropSubtext: "CSV veya Excel dosyaları desteklenir (Max 5MB)",
+                selectBtn: "Bilgisayardan Seç",
+                errorNoUser: "Lütfen bir Kullanıcı Adı girin.",
+                errorNoAmount: "Lütfen geçerli bir miktar giriniz.",
+                processingVerifying: "Doğrulanıyor...",
+                processingUploading: "Veri Yükleniyor...",
+                processingVerifyDesc: "Kayıtlar veritabanı ile doğrulanıyor.",
+                processingUploadDesc: "Dosyanız Smile Zone sunucularına güvenli bir şekilde iletiliyor.",
+                reportTitle: "Yükleme Tamamlandı",
+                reportFile: "Dosya",
+                reportUploader: "Yükleyen",
+                reportCampaign: "Kampanya",
+                historyTitle: "Yükleme Geçmişi",
+                historyRecords: "kayıt",
+                refreshTooltip: "Tabloyu Yenile",
+                colFile: "Dosya Detayları",
+                colUserCampaign: "Kullanıcı / Kampanya",
+                colTotal: "Toplam",
+                colSuccess: "Başarılı",
+                colExist: "Mevcut",
+                colDuplicate: "Tekrar",
+                colError: "Hata",
+                colStatus: "Durum",
+                colActions: "İşlem",
+                statusCompleted: "Tamamlandı",
+                statusUntitled: "İsimsiz",
+                statusAnon: "Anonim",
+                historyLoading: "Veriler yükleniyor...",
+                historyEmptyTitle: "Kayıt bulunamadı.",
+                historyEmptyDesc: "Yükleme geçmişiniz burada görünecektir.",
+                historyFetchError: "Geçmiş verileri alınamadı.",
+                msgSentChecking: "Dosya gönderildi. Veritabanı kontrol ediliyor...",
+                msgRequestChecking: "İstek gönderildi. Veritabanı kontrol ediliyor...",
+                msgNetworkError: "Ağ bağlantısı koptu.",
+                msgDeleted: "Kayıt ve ilgili veriler silinmek üzere işaretlendi.",
+                msgDeleteError: "Silme işlemi başarısız oldu.",
+                deleteTitle: "Kaydı ve Verileri Sil",
+                deleteConfirm: "Bu dosyayı ve içinden yüklenen TÜM verileri silmek istediğinize emin misiniz?",
+                deleteWarning: "Bu işlem geri alınamaz.",
+                deleteBtn: "Sil",
+                deletingBtn: "Siliniyor...",
+                cancelBtn: "İptal",
+
+                senderTitle: "Toplu Mesaj Gönderici",
+                senderSubtitle: "Otomatik kampanya mesajlaşma paneli.",
+                senderStartBtn: "Başlat",
+                senderStopBtn: "Durdur",
+                senderStatusSent: "Gönderildi",
+                senderStatusDelivered: "İletildi",
+                senderStatusRead: "Okundu",
+                senderStatusError: "Hata",
+                senderLogTitle: "Canlı Gönderim Akışı",
+                senderLogWaiting: "Sistem bekleniyor...",
+                senderLogRunning: "Sistem çalışıyor...",
+                senderDailyTitle: "Son Gönderim",
+                senderTotalTitle: "Genel Toplam (Tüm Zamanlar)",
+                targetAmount: "Miktar",
+
+                foldersTitle: "Sohbetler",
+                searchPlaceholder: "Sohbetlerde ara...",
+                typeMessage: "Bir mesaj yazın...",
+                online: "Çevrimiçi",
+                lastSeen: "Son görülme",
+                modeAuto: "Otomatik",
+                modeManual: "Manuel",
+                selectChat: "Sohbet Seçin",
+                selectChatDesc: "Görüşmeye başlamak için soldaki listeden bir sohbet seçin.",
+                sending: "Gönderiliyor..."
+            },
+            en: {
+                loginTitle: "Login",
+                username: "Username",
+                password: "Password",
+                loginBtn: "Login",
+                invalidLogin: "Invalid username or password",
+                usernamePlaceholder: "Enter your username",
+                passwordPlaceholder: "••••••",
+                menuLeads: "Leads Importer",
+                menuSender: "Bulk Sender",
+                menuMessenger: "Messenger",
+                loggedInAs: "Logged in as",
+                logout: "Logout",
+                pageTitle: "Leads Importer",
+                pageSubtitle: "Bulk customer data upload and tracking panel.",
+                downloadTemplate: "Download Template",
+                templateDownloaded: "Template downloaded successfully!",
+                templateError: "Failed to generate template.",
+                filterUser: "Filter User",
+                allUsers: "All Users",
+                dashboardStats: "Dashboard Stats",
+                statTotal: "Total Rows",
+                statSuccess: "Success",
+                statExist: "Exist",
+                statDuplicate: "Duplicate",
+                statError: "Error",
+                uploadTitle: "Upload File",
+                labelUser: "User Name",
+                labelUserPlaceholder: "Who is uploading?",
+                labelCampaign: "Campaign Name",
+                labelCampaignOptional: "(Optional)",
+                labelCampaignPlaceholder: "e.g. Summer Campaign 2025",
+                dropText: "Drag & drop file here",
+                dropSubtext: "Supports CSV or Excel files (Max 5MB)",
+                selectBtn: "Select from Computer",
+                errorNoUser: "Please enter a User Name.",
+                errorNoAmount: "Please enter a valid amount.",
+                processingVerifying: "Verifying...",
+                processingUploading: "Uploading Data...",
+                processingVerifyDesc: "Records are being verified with the database.",
+                processingUploadDesc: "Your file is being securely transmitted to Smile Zone servers.",
+                reportTitle: "Upload Complete",
+                reportFile: "File",
+                reportUploader: "Uploaded by",
+                reportCampaign: "Campaign",
+                historyTitle: "Upload History",
+                historyRecords: "records",
+                refreshTooltip: "Refresh Table",
+                colFile: "File Details",
+                colUserCampaign: "User / Campaign",
+                colTotal: "Total",
+                colSuccess: "Success",
+                colExist: "Exist",
+                colDuplicate: "Duplicate",
+                colError: "Error",
+                colStatus: "Status",
+                colActions: "Action",
+                statusCompleted: "Completed",
+                statusUntitled: "Untitled",
+                statusAnon: "Anonymous",
+                historyLoading: "Loading data...",
+                historyEmptyTitle: "No records found.",
+                historyEmptyDesc: "Your upload history will appear here.",
+                historyFetchError: "Failed to fetch history.",
+                msgSentChecking: "File sent. Checking database...",
+                msgRequestChecking: "Request sent. Checking database...",
+                msgNetworkError: "Network connection lost.",
+                msgDeleted: "Record and related data marked for deletion.",
+                msgDeleteError: "Failed to delete record.",
+                deleteTitle: "Delete Record & Data",
+                deleteConfirm: "Are you sure you want to delete this file and ALL data imported from it?",
+                deleteWarning: "This action cannot be undone.",
+                deleteBtn: "Delete",
+                deletingBtn: "Deleting...",
+                cancelBtn: "Cancel",
+                senderTitle: "Bulk Message Sender",
+                senderSubtitle: "Automated campaign messaging dashboard.",
+                senderStartBtn: "Start",
+                senderStopBtn: "Stop",
+                senderStatusSent: "Sent",
+                senderStatusDelivered: "Delivered",
+                senderStatusRead: "Read",
+                senderStatusError: "Error",
+                senderLogTitle: "Live Transmission Log",
+                senderLogWaiting: "System idle...",
+                senderLogRunning: "System running...",
+                senderDailyTitle: "Last Sending",
+                senderTotalTitle: "Lifetime Total",
+                targetAmount: "Amount",
+                foldersTitle: "Chats",
+                searchPlaceholder: "Search chats...",
+                typeMessage: "Type a message...",
+                online: "Online",
+                lastSeen: "Last seen",
+                modeAuto: "Auto",
+                modeManual: "Manual",
+                selectChat: "Select Chat",
+                selectChatDesc: "Select a chat from the left list to start messaging.",
+                sending: "Sending..."
+            }
+        };
+
+        // --- MOCK USERS ---
+        const MOCK_USERS = [
+            { id: 1, user_name: 'admin', password: 'admin', role: 'admin' },
+            { id: 2, user_name: 'Burak', password: '123456', role: 'user' },
+            { id: 3, user_name: 'Fırat', password: '654321', role: 'user' }
+        ];
+
+        // --- HELPER COMPONENTS ---
+
+        function Icon({ name, className }) {
+            const elementRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide && elementRef.current) {
+                    const i = document.createElement('i');
+                    i.setAttribute('data-lucide', name);
+                    if (className) i.setAttribute('class', className);
+                    elementRef.current.innerHTML = '';
+                    elementRef.current.appendChild(i);
+                    window.lucide.createIcons({ root: elementRef.current });
+                }
+            }, [name, className]);
+            return <span ref={elementRef} className="inline-flex items-center justify-center"></span>;
+        }
+
+        function SmileZoneLogo() {
+            return (
+                <svg viewBox="0 0 300 80" className="h-14 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 30H30V15C30 12.2386 32.2386 10 35 10H45C47.7614 10 50 12.2386 50 15V30H65C67.7614 30 70 32.2386 70 35V45C70 47.7614 67.7614 50 65 50H50V65C50 67.7614 47.7614 70 45 70H35C32.2386 70 30 67.7614 30 65V50H15C12.2386 50 10 47.7614 10 45V35C10 32.2386 12.2386 30 15 30Z" fill="#0099FF"/>
+                    <path d="M30 42C30 42 35 48 40 48C45 48 50 42 50 42" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+                    <text x="85" y="40" fontFamily="Poppins, sans-serif" fontWeight="bold" fontSize="28" fill="#0099FF">SMILE ZONE</text>
+                    <text x="85" y="62" fontFamily="Poppins, sans-serif" fontWeight="bold" fontSize="20" fill="#0099FF" letterSpacing="0.05em">TURKEY</text>
+                    <rect x="78" y="15" width="2" height="50" fill="#0099FF"/>
+                </svg>
+            );
+        }
+
+        function DeleteModal({ isOpen, onClose, onConfirm, isDeleting, t, fileName }) {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-[2px] animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 border border-gray-100">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+                                {isDeleting ? <div className="spinner w-6 h-6 border-2 border-red-500 border-l-transparent"></div> : <Icon name="trash-2" className="w-6 h-6" />}
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">{t.deleteTitle}</h3>
+                            <p className="text-sm text-gray-500 mb-1">{t.deleteConfirm}</p>
+                            <p className="text-sm font-semibold text-gray-700 mb-4 break-all">"{fileName}"</p>
+                            <p className="text-xs text-red-500 font-medium mb-6">{t.deleteWarning}</p>
+                            <div className="flex gap-3 w-full">
+                                <button onClick={onClose} disabled={isDeleting} className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50">{t.cancelBtn}</button>
+                                <button onClick={onConfirm} disabled={isDeleting} className="flex-1 px-4 py-2 bg-red-600 rounded-lg text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">{isDeleting ? t.deletingBtn : t.deleteBtn}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function LoginOverlay({ onLogin, t, language, toggleLanguage }) {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                const user = MOCK_USERS.find(u => u.user_name === username && u.password === password);
+                if (user) { onLogin(user); } else { setError(t.invalidLogin); }
+            };
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-[4px]">
+                    <div className="absolute top-6 right-6 z-50">
+                        <button onClick={toggleLanguage} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-all shadow-sm flex items-center gap-2"><Icon name="globe" className="w-4 h-4" />{language === 'tr' ? 'EN' : 'TR'}</button>
+                    </div>
+                    <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 transform transition-all scale-100 animate-fade-in relative">
+                        <div className="flex justify-center mb-8"><SmileZoneLogo /></div>
+                        <h2 className="text-xl font-bold text-gray-800 text-center mb-6">{t.loginTitle}</h2>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t.username}</label><input type="text" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder={t.usernamePlaceholder} value={username} onChange={(e) => setUsername(e.target.value)} /></div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label><input type="password" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" placeholder={t.passwordPlaceholder} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+                            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                            <button type="submit" className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg shadow-md transition-all">{t.loginBtn}</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function Sidebar({ currentUser, onLogout, t, activeMenu, setActiveMenu }) {
+            return (
+                <div className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-40 shadow-lg">
+                    <div className="p-6 flex items-center justify-center border-b border-gray-100 h-24">
+                        <div className="flex flex-col items-center"><div className="mb-1"><SmileZoneLogo /></div></div>
+                    </div>
+                    <nav className="flex-1 p-4 mt-4 space-y-2 overflow-y-auto custom-scroll">
+                        <button onClick={() => setActiveMenu('leads')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${activeMenu === 'leads' ? 'bg-brand-50 text-brand-700 border border-brand-100 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}><Icon name="upload-cloud" className="w-5 h-5" />{t.menuLeads}</button>
+                        <button onClick={() => setActiveMenu('sender')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${activeMenu === 'sender' ? 'bg-brand-50 text-brand-700 border border-brand-100 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}><Icon name="send" className="w-5 h-5" />{t.menuSender}</button>
+                        <button onClick={() => setActiveMenu('messenger')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${activeMenu === 'messenger' ? 'bg-brand-50 text-brand-700 border border-brand-100 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}><Icon name="message-circle" className="w-5 h-5" />{t.menuMessenger}</button>
+                    </nav>
+                    {currentUser && (<div className="p-4 border-t border-gray-100 bg-gray-50"><div className="flex items-center gap-3 mb-3"><div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold">{currentUser.user_name.charAt(0).toUpperCase()}</div><div><p className="text-xs text-gray-500">{t.loggedInAs}</p><p className="text-sm font-semibold text-gray-800">{currentUser.user_name}</p></div></div><button onClick={onLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Icon name="log-out" className="w-3 h-3" />{t.logout}</button></div>)}
+                </div>
+            );
+        }
+
+        // --- CUBE LOADER ANIMATION ---
+        function CubeLoader({ t, isSending }) {
+            const cubes = useMemo(() => {
+                let c = [];
+                for(let x=-1; x<=1; x++) {
+                    for(let y=-1; y<=1; y++) {
+                        for(let z=-1; z<=1; z++) {
+                            c.push({
+                                x, y, z,
+                                dx: (Math.random() - 0.5) * 250, 
+                                dy: 150 + Math.random() * 100, 
+                                dz: (Math.random() - 0.5) * 250,
+                                rx: Math.random() * 720,
+                                ry: Math.random() * 720,
+                                delay: Math.random() * 0.1 
+                            });
+                        }
+                    }
+                }
+                return c;
+            }, []);
+
+            const animState = isSending ? 'running' : 'paused';
+
+            return (
+                <div className="scene-container">
+                    <div className="cube-group" style={{ animationPlayState: animState }}>
+                        {cubes.map((c, i) => (
+                            <div key={i} className="voxel" style={{
+                                '--x': c.x, '--y': c.y, '--z': c.z,
+                                '--dx': c.dx, '--dy': c.dy, '--dz': c.dz,
+                                '--rx': c.rx, '--ry': c.ry,
+                                animationDelay: `${c.delay}s`,
+                                animationPlayState: animState
+                            }}>
+                                <div className="face front"></div>
+                                <div className="face back"></div>
+                                <div className="face right"></div>
+                                <div className="face left"></div>
+                                <div className="face top"></div>
+                                <div className="face bottom"></div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className={`mt-12 text-brand-600 font-bold text-sm tracking-widest uppercase ${isSending ? 'animate-pulse' : ''}`}>
+                        {isSending ? t.senderLogRunning : t.senderLogWaiting}
+                    </div>
+                </div>
+            )
+        }
+
+        // --- STATS COMPONENTS ---
+
+        function PastelStatsGrid({ title, data, icon, t }) {
+            return (
+                <div className="mb-8 animate-fade-in w-full">
+                    {title && <div className="flex items-center gap-2 mb-4"><h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">{icon && <Icon name={icon} className="w-5 h-5 text-gray-500" />}{title}</h2></div>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        {data.total !== undefined ? (
+                            <>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-gray-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.statTotal}</h3><div className="p-2 bg-gray-50 rounded-lg text-gray-400 group-hover:bg-gray-100 transition-colors"><Icon name="database" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-gray-800">{data.total.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-green-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-green-600/70 uppercase tracking-wider">{t.statSuccess}</h3><div className="p-2 bg-green-50 rounded-lg text-green-600"><Icon name="check-circle-2" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-green-600">{data.success.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-brand-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-brand-600/70 uppercase tracking-wider">{t.statExist}</h3><div className="p-2 bg-brand-50 rounded-lg text-brand-600"><Icon name="info" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-brand-700">{data.exist.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-orange-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-orange-500/70 uppercase tracking-wider">{t.statDuplicate}</h3><div className="p-2 bg-orange-50 rounded-lg text-orange-600"><Icon name="copy" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-orange-500">{data.duplicate.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-red-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-red-500/70 uppercase tracking-wider">{t.statError}</h3><div className="p-2 bg-red-50 rounded-lg text-red-600"><Icon name="alert-triangle" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-red-600">{data.error.toLocaleString()}</p></div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-blue-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-blue-600/70 uppercase tracking-wider">{t.senderStatusSent}</h3><div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors"><Icon name="send" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-blue-700">{data.sent.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-green-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-green-600/70 uppercase tracking-wider">{t.senderStatusDelivered}</h3><div className="p-2 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-100 transition-colors"><Icon name="check" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-green-600">{data.delivered.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-purple-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-purple-600/70 uppercase tracking-wider">{t.senderStatusRead}</h3><div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors"><Icon name="check-check" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-purple-700">{data.read.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-red-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-red-600/70 uppercase tracking-wider">{t.senderStatusError}</h3><div className="p-2 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-100 transition-colors"><Icon name="alert-circle" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-red-600">{data.error.toLocaleString()}</p></div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function PremiumStatsBar({ title, data, icon, t }) {
+            return (
+                <div className="mb-6 p-6 rounded-2xl relative overflow-hidden bg-gradient-to-r from-brand-600 to-brand-500 shadow-xl transition-all hover:scale-[1.01]">
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-blue-300 opacity-10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="relative z-10 text-white">
+                        <div className="flex items-center justify-between mb-6"><h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 opacity-90"><Icon name={icon || "bar-chart-2"} className="w-4 h-4" />{title}</h2></div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 opacity-80"><div className="p-1 rounded bg-white/20"><Icon name="send" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusSent}</span></div><span className="text-2xl lg:text-3xl font-bold">{data.sent.toLocaleString()}</span></div>
+                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 text-green-100"><div className="p-1 rounded bg-green-400/20"><Icon name="check" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusDelivered}</span></div><span className="text-2xl lg:text-3xl font-bold text-green-50">{data.delivered.toLocaleString()}</span></div>
+                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 text-purple-100"><div className="p-1 rounded bg-purple-400/20"><Icon name="check-check" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusRead}</span></div><span className="text-2xl lg:text-3xl font-bold text-purple-50">{data.read.toLocaleString()}</span></div>
+                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 text-red-100"><div className="p-1 rounded bg-red-400/20"><Icon name="alert-circle" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusError}</span></div><span className="text-2xl lg:text-3xl font-bold text-red-50">{data.error.toLocaleString()}</span></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- LEADS PAGE SUB-COMPONENTS ---
+        function GlobalStats({ history, selectedUser, onUserChange, uniqueUsers, currentUser, t }) {
+            const effectiveSelectedUser = currentUser.role === 'admin' ? selectedUser : currentUser.user_name;
+            const filteredHistory = useMemo(() => { if (!effectiveSelectedUser) return history; return history.filter(item => (item.user_name || 'Anonymous') === effectiveSelectedUser); }, [history, effectiveSelectedUser]);
+            const stats = useMemo(() => { return filteredHistory.reduce((acc, curr) => ({ total: acc.total + (Number(curr.total_rows) || 0), success: acc.success + (Number(curr.success_count) || 0), duplicate: acc.duplicate + (Number(curr.duplicate_count) || 0), exist: acc.exist + (Number(curr.exist_count) || 0), error: acc.error + (Number(curr.error_count) || 0) }), { total: 0, success: 0, duplicate: 0, exist: 0, error: 0 }); }, [filteredHistory]);
+
+            return (
+                <div className="mb-8 animate-fade-in w-full">
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-4 gap-4">
+                        <div className="w-full">
+                            <div className="flex justify-between items-end mb-4">
+                                <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2"><Icon name="bar-chart-2" className="w-5 h-5 text-gray-500" />{t.dashboardStats}</h2>
+                                {currentUser.role === 'admin' && (<div className="flex flex-col gap-1 w-full md:w-auto min-w-[200px]"><label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.filterUser}</label><div className="relative"><select value={selectedUser} onChange={(e) => onUserChange(e.target.value)} className="w-full pl-3 pr-10 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 appearance-none shadow-sm cursor-pointer font-medium"><option value="">{t.allUsers}</option>{uniqueUsers.map(user => (<option key={user} value={user}>{user}</option>))}</select><div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><Icon name="chevron-down" className="w-4 h-4" /></div></div></div>)}
+                            </div>
+                            <PastelStatsGrid title="" data={stats} icon="" t={t} />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function UploadArea({ onFileSelect, uploading, userName, setUserName, campaignName, setCampaignName, onError, currentUser, t }) {
+            const inputRef = useRef(null);
+            useEffect(() => { if (currentUser) setUserName(currentUser.user_name); }, [currentUser, setUserName]);
+            const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
+            const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); if (!userName.trim()) { onError(t.errorNoUser); document.getElementById('userNameInput')?.focus(); return; } if (e.dataTransfer.files && e.dataTransfer.files[0]) onFileSelect(e.dataTransfer.files[0]); };
+            const handleAreaClick = () => { if (uploading) return; if (!userName.trim()) { onError(t.errorNoUser); document.getElementById('userNameInput')?.focus(); return; } if (inputRef.current) inputRef.current.click(); };
+
+            return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+                    <div className="flex items-center gap-3 mb-8"><div className="w-1 h-8 bg-brand-500 rounded-full"></div><h2 className="text-lg font-bold text-gray-900">{t.uploadTitle}</h2></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">{t.labelUser} <span className="text-red-500">*</span></label><div className="relative group"><div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"><Icon name="user" className="w-4 h-4" /></div><input id="userNameInput" type="text" value={userName} readOnly={currentUser.role !== 'admin'} onChange={(e) => setUserName(e.target.value)} placeholder={t.labelUserPlaceholder} className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm outline-none transition-all ${currentUser.role !== 'admin' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-400 focus:border-brand-400'}`} /></div></div>
+                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">{t.labelCampaign} <span className="text-gray-400 font-normal normal-case">{t.labelCampaignOptional}</span></label><div className="relative group"><div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-500 transition-colors pointer-events-none"><Icon name="flag" className="w-4 h-4" /></div><input id="campaignNameInput" type="text" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder={t.labelCampaignPlaceholder} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all bg-gray-50 focus:bg-white placeholder-gray-400" /></div></div>
+                    </div>
+                    <div className={`border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer select-none relative overflow-hidden group ${uploading ? 'bg-gray-50 border-gray-300 opacity-50 cursor-not-allowed' : 'border-brand-200 hover:border-brand-400 hover:bg-brand-50/20 bg-white'}`} onDragOver={handleDragOver} onDrop={handleDrop} onClick={handleAreaClick}>
+                        <input type="file" ref={inputRef} className="hidden" accept=".csv,.xlsx,.xls" multiple onChange={(e) => { if (e.target.files && e.target.files[0]) { onFileSelect(e.target.files[0]); e.target.value = ''; } }} disabled={uploading} />
+                        <div className="flex flex-col items-center justify-center gap-4 pointer-events-none relative z-10"><div className="w-20 h-20 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-brand-100"><Icon name="upload" className="w-10 h-10" /></div><div><h3 className="text-xl font-bold text-gray-900">{t.dropText}</h3><p className="text-sm text-gray-500 mt-2">{t.dropSubtext}</p></div><button type="button" className="px-8 py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg shadow-lg shadow-brand-600/20 transition-all mt-4 pointer-events-auto transform hover:-translate-y-0.5 border border-transparent" onClick={(e) => { e.stopPropagation(); handleAreaClick(); }} disabled={uploading}>{t.selectBtn}</button></div>
+                    </div>
+                </div>
+            );
+        };
+
+        function ProcessingState({ isSearching, t }) {
+            return (
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-12 flex flex-col items-center justify-center min-h-[400px]">
+                    <div className="spinner mb-8"></div>
+                    <h3 className="text-2xl font-bold text-brand-900 mb-3">{isSearching ? t.processingVerifying : t.processingUploading}</h3>
+                    <p className="text-gray-500 text-center max-w-md text-lg">{isSearching ? t.processingVerifyDesc : t.processingUploadDesc}</p>
+                    <div className="w-full max-w-md bg-gray-100 rounded-full h-2 mt-10 overflow-hidden"><div className="bg-brand-500 h-2 rounded-full w-2/3 animate-[pulse_1.5s_ease-in-out_infinite]"></div></div>
+                </div>
+            );
+        }
+
+        function ReportSummary({ summary, t }) {
+            const campaignName = summary.campaignName;
+            return (
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-8 animate-fade-in border-l-[6px] border-l-brand-500 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none text-brand-900"><Icon name="clipboard-check" className="w-32 h-32" /></div>
+                    <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4 relative z-10"><div><div className="flex items-center gap-3 mb-2"><div className="p-1.5 bg-green-100 rounded-full text-green-700"><Icon name="check" className="w-5 h-5" /></div><h2 className="text-xl font-bold text-gray-900">{t.reportTitle}</h2></div><p className="text-sm text-gray-500 ml-1">{t.reportFile}: <span className="font-semibold text-brand-700 bg-brand-50 px-2 py-0.5 rounded">{summary.fileName}</span></p></div></div>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 relative z-10">
+                        <div className="p-5 bg-gray-50 rounded-xl border border-gray-100 flex flex-col items-center text-center"><span className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t.colTotal}</span><span className="text-3xl font-bold text-gray-800">{summary.total_rows}</span></div>
+                        <div className="p-5 bg-green-50 rounded-xl border border-green-100 flex flex-col items-center text-center"><span className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">{t.colSuccess}</span><span className="text-3xl font-bold text-green-700">{summary.success_count}</span></div>
+                        <div className="p-5 bg-brand-50 rounded-xl border border-brand-100 flex flex-col items-center text-center"><span className="text-xs font-bold text-brand-700 uppercase tracking-wider mb-2">{t.colExist}</span><span className="text-3xl font-bold text-brand-700">{summary.exist_count}</span></div>
+                        <div className="p-5 bg-orange-50 rounded-xl border border-orange-100 flex flex-col items-center text-center"><span className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-2">{t.colDuplicate}</span><span className="text-3xl font-bold text-orange-600">{summary.duplicate_count}</span></div>
+                        <div className="p-5 bg-red-50 rounded-xl border border-red-100 flex flex-col items-center text-center"><span className="text-xs font-bold text-red-600 uppercase tracking-wider mb-2">{t.colError}</span><span className="text-3xl font-bold text-red-600">{summary.error_count}</span></div>
+                    </div>
+                    <div className="mt-6 pt-6 border-t border-gray-100 flex items-center gap-6 text-sm text-gray-500"><div className="flex items-center gap-2"><div className="text-brand-500"><Icon name="user" className="w-4 h-4" /></div>{t.reportUploader}: <span className="font-semibold text-gray-700">{summary.userName}</span></div>{campaignName && (<div className="flex items-center gap-2"><div className="text-brand-500"><Icon name="flag" className="w-4 h-4" /></div>{t.reportCampaign}: <span className="font-semibold text-gray-700">{campaignName}</span></div>)}</div>
+                </div>
+            );
+        }
+
+        function HistoryTable({ history, selectedUser, isLoading, onRefresh, currentUser, currentLang, t, onDelete }) {
+            const effectiveSelectedUser = currentUser.role === 'admin' ? selectedUser : currentUser.user_name;
+            const filteredHistory = useMemo(() => {
+                if (currentUser.role !== 'admin') return history.filter(item => (item.user_name || 'Anonymous') === currentUser.user_name);
+                if (selectedUser) return history.filter(item => (item.user_name || 'Anonymous') === selectedUser);
+                return history;
+            }, [history, selectedUser, currentUser]);
+            const formatDate = (dateStr) => { if (!dateStr) return '-'; const date = new Date(dateStr); const locale = currentLang === 'en' ? 'en-US' : 'tr-TR'; return date.toLocaleDateString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' }); };
+            const canDelete = (item) => currentUser.role === 'admin' || (item.user_name === currentUser.user_name);
+
+            return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden min-h-[400px]">
+                    <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white"><div className="flex items-center gap-3"><div className="w-1 h-6 bg-brand-600 rounded-full"></div><h3 className="text-lg font-bold text-gray-900">{t.historyTitle}</h3></div><div className="flex items-center gap-3"><span className="text-xs bg-gray-50 text-gray-600 px-3 py-1.5 rounded-full font-bold">{filteredHistory.length} {t.historyRecords}</span><button onClick={onRefresh} className="p-2 bg-gray-50 hover:bg-brand-50 rounded-full text-gray-400 hover:text-brand-500 transition-colors" title={t.refreshTooltip}><Icon name="refresh-cw" className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /></button></div></div>
+                    <div className="overflow-x-auto custom-scroll flex-1">
+                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                            <thead><tr className="bg-gray-50/50 border-b border-gray-100"><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colFile}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colUserCampaign}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colTotal}</th><th className="px-6 py-4 text-xs font-bold text-green-700 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colSuccess}</th><th className="px-6 py-4 text-xs font-bold text-brand-700 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colExist}</th><th className="px-6 py-4 text-xs font-bold text-orange-600 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colDuplicate}</th><th className="px-6 py-4 text-xs font-bold text-red-600 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colError}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colStatus}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colActions}</th></tr></thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {isLoading ? (<tr><td colSpan="9" className="px-6 py-12 text-center text-sm text-gray-500"><div className="flex flex-col items-center justify-center gap-3"><div className="spinner w-6 h-6 border-2"></div><span>{t.historyLoading}</span></div></td></tr>) : filteredHistory.length > 0 ? ( filteredHistory.map((item) => { const cName = item.campaign_name || item['Campaign Name']; return (<tr key={item.id} className="hover:bg-gray-50 transition-colors group"><td className="px-6 py-4"><div className="flex items-center gap-3"><div className="p-2 bg-brand-50 text-brand-600 rounded-lg group-hover:bg-brand-100 transition-colors"><Icon name="file-spreadsheet" className="w-4 h-4" /></div><div><div className="text-sm font-semibold text-gray-900 max-w-[150px] truncate" title={item.file_name}>{item.file_name || t.statusUntitled}</div><div className="text-xs text-gray-400 mt-0.5">{formatDate(item.created_at)}</div></div></div></td><td className="px-6 py-4"><div className="flex flex-col"><div className="flex items-center gap-2 mb-1"><div className="text-gray-300"><Icon name="user" className="w-3 h-3" /></div><span className="text-sm text-gray-600">{item.user_name || t.statusAnon}</span></div>{cName && (<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-brand-50 text-brand-700 w-fit max-w-[150px] truncate" title={cName}>{cName}</span>)}</div></td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-medium">{item.total_rows}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-green-700 text-right font-bold bg-green-50/20">{item.success_count}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-brand-700 text-right font-bold bg-brand-50/20">{item.exist_count || 0}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 text-right font-medium">{item.duplicate_count}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right font-medium">{item.error_count}</td><td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-1 inline-flex items-center gap-1.5 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800`}><span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>{t.statusCompleted}</span></td><td className="px-6 py-4 whitespace-nowrap text-right">{canDelete(item) && (<button onClick={() => onDelete(item)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title={t.deleteBtn}><Icon name="trash-2" className="w-4 h-4" /></button>)}</td></tr>); }) ) : (<tr><td colSpan="9" className="px-6 py-16 text-center text-sm text-gray-500"><div className="flex flex-col items-center gap-3"><div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icon name="inbox" className="w-6 h-6" /></div><div><span className="font-semibold text-gray-600 block">{t.historyEmptyTitle}</span><p className="text-xs text-gray-400 mt-1">{t.historyEmptyDesc}</p></div></div></td></tr>)}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- BULK SENDER PAGE ---
+        function BulkSenderPage({ t, setAlert }) {
+            const [isSending, setIsSending] = useState(false);
+            const [targetCount, setTargetCount] = useState('');
+            const [dailyStats, setDailyStats] = useState({ sent: 0, delivered: 0, read: 0, error: 0 });
+            const [totalStats, setTotalStats] = useState({ sent: 0, delivered: 0, read: 0, error: 0 });
+            const [logs, setLogs] = useState([]);
+            const logEndRef = useRef(null);
+
+            // Robust Date Check
+            const isToday = (dateString) => {
+                if (!dateString) return false;
+                const d = new Date(dateString);
+                const today = new Date();
+                return d.toDateString() === today.toDateString(); 
+            };
+
+            const fetchData = useCallback(async () => {
+                // 1. Fetch recent logs from 'leads' table
+                const { data: logsData, error: logsError } = await supabase
+                    .from(LEADS_TABLE_NAME)
+                    .select('id, phone, last_status, updated, created_at')
+                    .order('updated', { ascending: false })
+                    .limit(20);
+                
+                if (logsData) {
+                    const formatted = logsData.map(log => ({
+                        id: log.id,
+                        phone: log.phone,
+                        status: log.last_status,
+                        time: new Date(log.updated || log.created_at).toLocaleTimeString()
+                    })).reverse();
+                    setLogs(formatted);
+                }
+
+                // 2. Fetch stats from 'leads' table
+                const { data: statsData, error: statsError } = await supabase
+                    .from(LEADS_TABLE_NAME)
+                    .select('last_status, broadcast_date');
+
+                if (statsError) {
+                    console.error('Stats fetch error:', statsError);
+                    if (statsError.code === 'PGRST301' || statsData === null) {
+                    }
+                }
+
+                if (statsData) {
+                    const newTotal = { sent: 0, delivered: 0, read: 0, error: 0 };
+                    const newDaily = { sent: 0, delivered: 0, read: 0, error: 0 };
+                    
+                    statsData.forEach(row => {
+                        const status = (row.last_status || '').toLowerCase().trim();
+                        let key = null;
+                        if (status === 'sent') key = 'sent';
+                        else if (status === 'delivered') key = 'delivered';
+                        else if (status === 'read') key = 'read';
+                        else if (status === 'failed') key = 'error';
+
+                        if (key) {
+                            newTotal[key]++;
+                            if (isToday(row.broadcast_date)) {
+                                newDaily[key]++;
+                            }
+                        }
+                    });
+
+                    setTotalStats(newTotal);
+                    setDailyStats(newDaily);
+                } else if (statsData === null && !statsError) {
+                     setAlert({type: 'error', message: "Veri bulunamadı. Supabase 'leads' tablosunda RLS (Erişim İzni) kapalı olduğundan emin olun."});
+                }
+            }, []); 
+
+            useEffect(() => {
+                fetchData(); 
+                const intervalId = setInterval(fetchData, 5000);
+                const channel = supabase
+                    .channel('realtime-leads-update')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: LEADS_TABLE_NAME }, (payload) => {
+                        fetchData();
+                    })
+                    .subscribe();
+
+                return () => {
+                    clearInterval(intervalId);
+                    supabase.removeChannel(channel);
+                };
+            }, [fetchData]);
+
+            useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
+
+            const startSystem = async () => {
+                if(isSending) return;
+                if(!targetCount || parseInt(targetCount) <= 0) {
+                    setAlert({type: 'error', message: t.errorNoAmount});
+                    return;
+                }
+                
+                setIsSending(true);
+
+                try {
+                    await fetch(SENDER_WEBHOOK_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'start', batch_limit: parseInt(targetCount) })
+                    });
+                } catch (e) { 
+                    console.error("Webhook Start Error", e);
+                    setIsSending(false); 
+                }
+            };
+
+            const stopSystem = async () => {
+                setIsSending(false);
+                try {
+                    await fetch(SENDER_WEBHOOK_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'stop' })
+                    });
+                } catch (e) { console.error("Webhook Stop Error", e); }
+            };
+
+            const getStatusColor = (status) => { 
+                if (!status) return 'text-gray-500';
+                const s = status.toLowerCase();
+                switch(s) { 
+                    case 'sent': return 'text-blue-500'; 
+                    case 'delivered': return 'text-green-500'; 
+                    case 'read': return 'text-purple-500'; 
+                    case 'failed': case 'error': return 'text-red-500'; 
+                    default: return 'text-gray-500'; 
+                } 
+            };
+            const getStatusIcon = (status) => { 
+                if (!status) return 'clock';
+                const s = status.toLowerCase();
+                switch(s) { 
+                    case 'sent': return 'send'; 
+                    case 'delivered': return 'check'; 
+                    case 'read': return 'check-check'; 
+                    case 'failed': case 'error': return 'alert-circle'; 
+                    default: return 'clock'; 
+                } 
+            };
+
+            return (
+                <div className="animate-fade-in w-full pb-8">
+                    <div className="flex justify-between items-end mb-8 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shadow-inner"><Icon name="message-square" className="w-6 h-6" /></div>
+                            <div><h1 className="text-2xl font-bold text-gray-900">{t.senderTitle}</h1><p className="text-sm text-gray-500 font-medium">{t.senderSubtitle}</p></div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 mb-4">
+                        <PremiumStatsBar title={t.senderTotalTitle} data={totalStats} icon="globe" t={t} />
+                        <div className="border-t border-gray-200 my-4"></div>
+                        <PastelStatsGrid title={t.senderDailyTitle} data={dailyStats} icon="calendar" t={t} />
+                    </div>
+                    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row items-center justify-between gap-4">
+                            <h3 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="activity" className="w-4 h-4 text-brand-600" />{t.senderLogTitle}{isSending && <span className="flex h-3 w-3 relative ml-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>}</h3>
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-brand-500 h-9 transition-all hover:border-brand-200">
+                                    <span className="text-gray-500 text-xs font-bold whitespace-nowrap">{t.targetAmount}:</span>
+                                    <input 
+                                        type="number" 
+                                        value={targetCount} 
+                                        onChange={(e) => setTargetCount(e.target.value)} 
+                                        placeholder="∞" 
+                                        className="border-none outline-none text-sm font-semibold w-20 p-0 text-gray-800 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                                        disabled={isSending}
+                                    />
+                                </div>
+                                {!isSending ? (<button onClick={startSystem} className="px-4 py-1.5 rounded-lg font-bold text-xs text-white bg-brand-600 hover:bg-brand-700 shadow-md transition-all flex items-center gap-1 h-9"><Icon name="play" className="w-3 h-3" /> {t.senderStartBtn}</button>) : (<button onClick={stopSystem} className="px-4 py-1.5 rounded-lg font-bold text-xs text-white bg-red-500 hover:bg-red-600 shadow-md transition-all flex items-center gap-1 h-9"><Icon name="pause" className="w-3 h-3" /> {t.senderStopBtn}</button>)}
+                            </div>
+                        </div>
+                        <div className="h-80 overflow-y-auto p-4 custom-scroll bg-slate-50 space-y-2 font-mono text-sm">
+                            {logs.length === 0 ? (<div className="h-full flex items-center justify-center text-gray-400 italic"><CubeLoader t={t} isSending={isSending} /></div>) : ( logs.map(log => (<div key={log.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 shadow-sm animate-fade-in"><div className="flex items-center gap-3"><span className="text-gray-400 text-xs">[{log.time}]</span><span className="font-medium text-gray-800">{log.phone}</span></div><div className={`flex items-center gap-2 font-bold uppercase text-xs ${getStatusColor(log.status)}`}>{log.status === 'sent' && isSending && <span className="w-3 h-3 border-2 border-current border-l-transparent rounded-full animate-spin"></span>}<span>{t[`senderStatus${(log.status || '').charAt(0).toUpperCase() + (log.status || '').slice(1)}`] || log.status}</span><Icon name={getStatusIcon(log.status)} className="w-4 h-4" /></div></div>)) )}
+                            <div ref={logEndRef} />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MESSENGER PAGE COMPONENT (UPDATED WITH REAL LOGIC) ---
+        function MessengerPage({ t }) {
+            const [chatList, setChatList] = useState([]);
+            const [selectedChat, setSelectedChat] = useState(null);
+            const [chatMessages, setChatMessages] = useState([]);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [inputMsg, setInputMsg] = useState('');
+            const [isLoadingChats, setIsLoadingChats] = useState(false);
+            const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+            const messagesEndRef = useRef(null);
+
+            // Fetch Active Chats
+            const loadActiveChats = useCallback(async () => {
+                const { data, error } = await supabase
+                    .from(ACTIVE_CHATS_TABLE)
+                    .select('*')
+                    .order('last_interaction_at', { ascending: false });
+
+                if (!error && data) {
+                    setChatList(data);
+                } else {
+                    console.error("Error loading chats:", error);
+                }
+            }, []);
+
+            // Initial Load & Polling for Sidebar
+            useEffect(() => {
+                setIsLoadingChats(true);
+                loadActiveChats().finally(() => setIsLoadingChats(false));
+
+                // Polling for new chats/updates every 5 seconds
+                const interval = setInterval(loadActiveChats, 5000);
+
+                // Realtime subscription for chats
+                const channel = supabase
+                    .channel('realtime_chats')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: ACTIVE_CHATS_TABLE }, () => {
+                        loadActiveChats();
+                    })
+                    .subscribe();
+
+                return () => {
+                    clearInterval(interval);
+                    supabase.removeChannel(channel);
+                };
+            }, [loadActiveChats]);
+
+            // Load Messages when Chat Selected
+            useEffect(() => {
+                if (!selectedChat) return;
+
+                const loadMessages = async () => {
+                    setIsLoadingMessages(true);
+                    const { data, error } = await supabase
+                        .from(MESSAGES_TABLE)
+                        .select('*')
+                        .eq('lead_phone', selectedChat.lead_phone)
+                        .order('created_at', { ascending: true });
+
+                    if (!error && data) {
+                        setChatMessages(data);
+                    }
+                    setIsLoadingMessages(false);
+                };
+
+                loadMessages();
+
+                // Realtime subscription for messages
+                const channel = supabase
+                    .channel(`room_${selectedChat.lead_phone}`)
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE, filter: `lead_phone=eq.${selectedChat.lead_phone}` }, (payload) => {
+                        setChatMessages(prev => [...prev, payload.new]);
+                    })
+                    .subscribe();
+
+                return () => {
+                    supabase.removeChannel(channel);
+                };
+            }, [selectedChat]);
+
+            // Scroll to bottom on new message
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [chatMessages]);
+
+            const handleSendMessage = async () => {
+                if (!inputMsg.trim() || !selectedChat) return;
+
+                const phone = selectedChat.lead_phone;
+                const message = inputMsg;
+                setInputMsg(''); // Optimistic clear
+
+                // Send via Webhook
+                try {
+                    const formData = new FormData();
+                    formData.append('phone', phone);
+                    formData.append('message', message);
+
+                    await fetch(SEND_MESSAGE_WEBHOOK, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: formData
+                    });
+                    
+                    // Note: Realtime subscription will add the message to the list
+                } catch (error) {
+                    console.error("Send error:", error);
+                    alert("Mesaj gönderilemedi!");
+                }
+            };
+
+            const handleToggleAI = async (e, chat) => {
+                e.stopPropagation();
+                const isAIActive = chat.ai_mode === 'active';
+                const newMode = isAIActive ? 'manual' : 'active';
+                
+                // Optimistic UI update
+                setChatList(prev => prev.map(c => c.lead_phone === chat.lead_phone ? { ...c, ai_mode: newMode } : c));
+                if (selectedChat?.lead_phone === chat.lead_phone) {
+                    setSelectedChat(prev => ({ ...prev, ai_mode: newMode }));
+                }
+
+                // 1. Update directly via Supabase
+                const { error: dbError } = await supabase
+                    .from(ACTIVE_CHATS_TABLE)
+                    .update({ ai_mode: newMode })
+                    .eq('id', chat.id); 
+
+                if (dbError) {
+                     console.error("Direct DB Update error:", dbError);
+                     // Hata olursa eski haline döndür
+                     loadActiveChats(); 
+                }
+
+                // 2. Also call the Webhook
+                try {
+                    const formData = new FormData();
+                    formData.append('phone', chat.lead_phone);
+                    formData.append('action', newMode === 'active' ? 'enable' : 'disable');
+
+                    await fetch(TOGGLE_AI_WEBHOOK, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: formData
+                    });
+                } catch (error) {
+                    console.error("AI Toggle Webhook error:", error);
+                }
+            };
+
+            const filteredChats = chatList.filter(c => 
+                (c.contact_name && c.contact_name.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                (c.lead_phone && c.lead_phone.includes(searchQuery))
+            );
+
+            return (
+                <div className="flex w-full h-full bg-white border-t border-gray-200 animate-fade-in overflow-hidden">
+                    {/* Sidebar */}
+                    <div className={`${selectedChat ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-50/50 border-r border-gray-200 flex-col flex-none`}>
+                        <div className="p-4 border-b border-gray-200 bg-white h-16 flex items-center">
+                            <h2 className="text-lg font-bold text-gray-800 mr-4">{t.foldersTitle}</h2>
+                            <div className="relative flex-1">
+                                <input 
+                                    type="text" 
+                                    placeholder={t.searchPlaceholder} 
+                                    className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-brand-300 focus:ring-0 rounded-lg text-sm transition-all" 
+                                    value={searchQuery} 
+                                    onChange={(e) => setSearchQuery(e.target.value)} 
+                                />
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="search" className="w-4 h-4" /></div>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scroll">
+                            {isLoadingChats ? (
+                                <div className="flex justify-center p-8"><div className="spinner w-6 h-6 border-2"></div></div>
+                            ) : filteredChats.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-400 p-4 text-center">
+                                    <Icon name="message-square-off" className="w-10 h-10 mb-2 opacity-20" />
+                                    <p className="text-sm">Sohbet bulunamadı.</p>
+                                </div>
+                            ) : (
+                                filteredChats.map(chat => (
+                                    <div key={chat.lead_phone} onClick={() => setSelectedChat(chat)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-white transition-all relative group ${selectedChat?.lead_phone === chat.lead_phone ? 'bg-white border-l-4 border-l-brand-500 shadow-sm z-10' : 'border-l-4 border-l-transparent'}`}>
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-300 flex items-center justify-center text-gray-600 font-bold text-lg shadow-inner flex-shrink-0">
+                                                {(chat.contact_name || chat.lead_phone).charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h4 className={`font-semibold text-sm truncate ${selectedChat?.lead_phone === chat.lead_phone ? 'text-brand-700' : 'text-gray-800'}`}>
+                                                        {chat.contact_name || chat.lead_phone}
+                                                    </h4>
+                                                    <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">
+                                                        {chat.last_interaction_at ? new Date(chat.last_interaction_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 truncate">{chat.last_msg_preview || '...'}</p>
+                                                <div className="flex items-center justify-between mt-3" onClick={(e) => e.stopPropagation()}>
+                                                    <div onClick={(e) => handleToggleAI(e, chat)} className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer transition-colors ${chat.ai_mode === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                        <div className={`w-2 h-2 rounded-full ${chat.ai_mode === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                                                        <span className="text-[10px] font-semibold uppercase tracking-wide">{chat.ai_mode === 'active' ? t.modeAuto : t.modeManual}</span>
+                                                    </div>
+                                                    {chat.unread_count > 0 && <span className="bg-brand-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">{chat.unread_count}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Chat Area */}
+                    <div className={`${!selectedChat ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-[#EFEAE2] relative min-w-0`}>
+                        <div className="absolute inset-0 opacity-40 pointer-events-none chat-bg"></div>
+                        {selectedChat ? (
+                            <>
+                                <div className="h-16 bg-gray-100 border-b border-gray-200 flex items-center px-4 md:px-6 justify-between relative z-10 shadow-sm flex-none">
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 -ml-2 text-gray-600"><Icon name="arrow-left" className="w-5 h-5" /></button>
+                                        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-sm">
+                                            {(selectedChat.contact_name || selectedChat.lead_phone).charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold text-gray-800">{selectedChat.contact_name || selectedChat.lead_phone}</h3>
+                                            <p className="text-xs text-gray-500">{selectedChat.lead_phone}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold ${selectedChat.ai_mode === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                                            <Icon name={selectedChat.ai_mode === 'active' ? 'zap' : 'user'} className="w-3 h-3" />
+                                            {selectedChat.ai_mode === 'active' ? 'AI ON' : 'AI OFF'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scroll relative z-10">
+                                    {isLoadingMessages ? (
+                                        <div className="flex justify-center p-4"><div className="spinner w-8 h-8 border-2"></div></div>
+                                    ) : (
+                                        chatMessages.map((msg, index) => {
+                                            const isOutgoing = msg.direction === 'outbound';
+                                            return (
+                                                <div key={msg.id || index} className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
+                                                    <div className={`max-w-[85%] md:max-w-[70%] p-3 rounded-lg shadow-sm text-sm relative ${isOutgoing ? 'bg-[#D9FDD3] text-gray-800 rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'}`}>
+                                                        {msg.body}
+                                                        <span className="text-[10px] text-gray-400 block text-right mt-1 flex items-center justify-end gap-1">
+                                                            {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                            {isOutgoing && <Icon name="check-check" className={`w-3 h-3 ${msg.status === 'read' ? 'text-blue-500' : 'text-gray-400'}`} />}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                    <div ref={messagesEndRef} />
+                                </div>
+
+                                <div className="p-3 md:p-4 bg-gray-100 border-t border-gray-200 relative z-10 flex items-center gap-2 md:gap-3 flex-none">
+                                    <button className="p-2 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"><Icon name="smile" className="w-6 h-6" /></button>
+                                    <button className="p-2 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"><Icon name="paperclip" className="w-6 h-6" /></button>
+                                    <input 
+                                        type="text" 
+                                        className="flex-1 py-3 px-4 rounded-lg border border-gray-300 focus:outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-400 transition-all bg-white" 
+                                        placeholder={t.typeMessage} 
+                                        value={inputMsg} 
+                                        onChange={(e) => setInputMsg(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                    />
+                                    {inputMsg ? (
+                                        <button onClick={handleSendMessage} className="p-3 bg-brand-600 text-white rounded-full hover:bg-brand-700 transition-colors shadow-md transform active:scale-95"><Icon name="send" className="w-5 h-5" /></button>
+                                    ) : (
+                                        <button className="p-3 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"><Icon name="mic" className="w-6 h-6" /></button>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 relative z-10">
+                                <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center mb-6 opacity-50"><Icon name="message-circle" className="w-16 h-16 text-gray-400" /></div>
+                                <h3 className="text-xl font-bold text-gray-600 mb-2">{t.selectChat}</h3>
+                                <p className="text-sm text-gray-400 max-w-xs text-center">{t.selectChatDesc}</p>
+                                <div className="mt-8 border-t border-gray-300 w-12"></div>
+                                <p className="text-xs mt-4 text-gray-400 font-semibold uppercase tracking-widest">Smile Zone Messenger</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- APP COMPONENT ---
+        function App() {
+            const [language, setLanguage] = useState('tr');
+            const [currentUser, setCurrentUser] = useState(null);
+            const [activeMenu, setActiveMenu] = useState('leads'); 
+            const [viewState, setViewState] = useState('idle');
+            const [currentSummary, setCurrentSummary] = useState(null);
+            const [history, setHistory] = useState([]);
+            const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+            const [selectedUser, setSelectedUser] = useState("");
+            const [userName, setUserName] = useState('');
+            const [campaignName, setCampaignName] = useState('');
+            const [alert, setAlert] = useState(null);
+            const [isSearching, setIsSearching] = useState(false);
+            const [fileToDelete, setFileToDelete] = useState(null);
+            const [isDeleting, setIsDeleting] = useState(false);
+
+            const t = TRANSLATIONS[language];
+            const uniqueUsers = useMemo(() => { const users = history.map(item => item.user_name || 'Anonymous'); return [...new Set(users)]; }, [history]);
+            const isAppMode = activeMenu === 'messenger';
+
+            useEffect(() => { fetchHistory(); }, []);
+            const handleLogin = (user) => { setCurrentUser(user); setUserName(user.user_name); };
+            const handleLogout = () => { setCurrentUser(null); setUserName(''); setCurrentSummary(null); setViewState('idle'); setCampaignName(''); setAlert(null); setFileToDelete(null); setActiveMenu('leads'); };
+            const toggleLanguage = () => { setLanguage(prev => prev === 'tr' ? 'en' : 'tr'); };
+
+            const handleDownloadTemplate = () => {
+                try {
+                    const sampleData = [{ "Full Name": "John Doe", "Phone Number": "905551234567", "Email": "john@example.com", "Note": "Interested in implant" }, { "Full Name": "Jane Smith", "Phone Number": "447700900000", "Email": "jane@example.com", "Note": "Veneers inquiry" }];
+                    const ws = XLSX.utils.json_to_sheet(sampleData);
+                    ws['!cols'] = [{wch: 20}, {wch: 15}, {wch: 25}, {wch: 30}];
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Leads Template");
+                    XLSX.writeFile(wb, "SmileZone_Leads_Template.xlsx");
+                    setAlert({type: 'success', message: t.templateDownloaded});
+                } catch (error) { setAlert({type: 'error', message: t.templateError}); }
+            };
+
+            const fetchHistory = async () => {
+                setIsHistoryLoading(true);
+                try {
+                    const { data, error } = await supabase.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
+                    if (error) throw error; if (data) setHistory(data);
+                } catch (err) { setAlert({type: 'error', message: t.historyFetchError}); } finally { setIsHistoryLoading(false); }
+            };
+
+            const handleDeleteClick = (item) => { setFileToDelete(item); };
+            const handleConfirmDelete = async () => {
+                if (!fileToDelete) return;
+                setIsDeleting(true);
+                try {
+                    await fetch(DELETE_WEBHOOK_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: fileToDelete.id, file_name: fileToDelete.file_name, user_name: fileToDelete.user_name }) });
+                    await new Promise(r => setTimeout(r, 1500));
+                    const { error } = await supabase.from(TABLE_NAME).delete().eq('id', fileToDelete.id);
+                    if (error) throw error;
+                    setAlert({type: 'success', message: t.msgDeleted});
+                    fetchHistory(); 
+                } catch (err) { setAlert({type: 'error', message: t.msgDeleteError}); } finally { setIsDeleting(false); setFileToDelete(null); }
+            };
+
+            const pollForRecord = async (fileName, uName) => {
+                setIsSearching(true);
+                const maxAttempts = 10;
+                let attempts = 0;
+                const check = async () => {
+                    try {
+                        const { data } = await supabase.from(TABLE_NAME).select('*').order('created_at', { ascending: false }).limit(5);
+                        if (data && data.length > 0) {
+                            const recentRecord = data.find(record => (new Date().getTime() - new Date(record.created_at).getTime()) < 60000);
+                            if (recentRecord) return recentRecord;
+                        }
+                    } catch (e) { console.error(e); }
+                    return null;
+                };
+                const loop = async () => {
+                    const record = await check();
+                    if (record) {
+                        setCurrentSummary({ fileName: record.file_name, userName: record.user_name, campaignName: record.campaign_name || record['Campaign Name'], total_rows: record.total_rows, success_count: record.success_count, duplicate_count: record.duplicate_count, exist_count: record.exist_count || 0, error_count: record.error_count, status: 'Completed' });
+                        setViewState('idle'); setCampaignName(''); fetchHistory(); setIsSearching(false);
+                    } else {
+                        attempts++;
+                        if (attempts < maxAttempts) { setTimeout(loop, 2000); } else { setAlert({type: 'success', message: t.msgSentChecking}); fetchHistory(); setViewState('idle'); setIsSearching(false); }
+                    }
+                };
+                loop();
+            };
+
+            const handleFileUpload = async (file) => {
+                if (!userName.trim()) { setAlert({type: 'warning', message: t.errorNoUser}); document.getElementById('userNameInput')?.focus(); return; }
+                setViewState('uploading'); setAlert(null); setCurrentSummary(null); 
+                const formData = new FormData();
+                formData.append('data', file, file.name); formData.append('User Name', userName); formData.append('File Name', file.name); formData.append('Campaign Name', campaignName);
+                try {
+                    await fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', credentials: 'omit', body: formData });
+                    await new Promise(r => setTimeout(r, 2000));
+                    await pollForRecord(file.name, userName);
+                } catch (error) {
+                    if (navigator.onLine) { setAlert({type: 'success', message: t.msgRequestChecking}); await pollForRecord(file.name, userName); } else { setAlert({type: 'error', message: t.msgNetworkError}); setViewState('idle'); }
+                }
+            };
+
+            return (
+                <div className="flex w-full h-full bg-[#F8FAFC]">
+                    {!currentUser && <LoginOverlay onLogin={handleLogin} language={language} toggleLanguage={toggleLanguage} t={t} />}
+                    <DeleteModal isOpen={!!fileToDelete} onClose={() => !isDeleting && setFileToDelete(null)} onConfirm={handleConfirmDelete} fileName={fileToDelete?.file_name} isDeleting={isDeleting} t={t} />
+                    <Sidebar currentUser={currentUser} onLogout={handleLogout} t={t} activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
+                    
+                    <main className={`flex-1 md:ml-64 transition-all duration-300 bg-[#F8FAFC] flex flex-col ${!currentUser ? 'blur-content' : ''} ${isAppMode ? 'h-full overflow-hidden' : 'min-h-screen p-6 md:p-10 overflow-y-auto'}`}>
+                        {/* HEADER (Only for non-messenger pages) */}
+                        {activeMenu !== 'messenger' && (
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 flex-none">
+                                <div>
+                                    {activeMenu === 'leads' && (
+                                        <>
+                                            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{t.pageTitle}</h1>
+                                            <p className="text-sm text-gray-500 mt-1">{t.pageSubtitle}</p>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={toggleLanguage} className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-all shadow-sm flex items-center gap-2" title="Dili Değiştir / Change Language"><Icon name="globe" className="w-4 h-4" />{language === 'tr' ? 'EN' : 'TR'}</button>
+                                    {activeMenu === 'leads' && viewState === 'idle' && (
+                                        <button onClick={handleDownloadTemplate} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm"><Icon name="download" className="w-4 h-4" />{t.downloadTemplate}</button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {currentUser && (
+                            <>
+                                {activeMenu === 'leads' && (
+                                    <>
+                                        <GlobalStats history={history} selectedUser={selectedUser} onUserChange={setSelectedUser} uniqueUsers={uniqueUsers} currentUser={currentUser} t={t} />
+                                        {alert && (
+                                            <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm ${alert.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-brand-50 text-brand-700 border border-brand-100'}`}>
+                                                <div className="flex-shrink-0"><Icon name={alert.type === 'error' ? 'alert-circle' : 'check-circle-2'} className="w-5 h-5" /></div>
+                                                <span className="text-sm font-medium">{alert.message}</span>
+                                                <button onClick={() => setAlert(null)} className="ml-auto hover:opacity-75"><Icon name="x" className="w-4 h-4" /></button>
+                                            </div>
+                                        )}
+                                        <div className="flex flex-col space-y-8 flex-1">
+                                            {viewState === 'uploading' ? (
+                                                <ProcessingState isSearching={isSearching} t={t} />
+                                            ) : (
+                                                <>
+                                                    {currentSummary && <ReportSummary summary={currentSummary} t={t} />}
+                                                    <UploadArea onFileSelect={handleFileUpload} uploading={false} userName={userName} setUserName={setUserName} campaignName={campaignName} setCampaignName={setCampaignName} onError={(msg) => setAlert({type: 'warning', message: msg})} currentUser={currentUser} t={t} />
+                                                </>
+                                            )}
+                                            <div className="flex-1 min-h-[400px]">
+                                                <HistoryTable history={history} selectedUser={selectedUser} isLoading={isHistoryLoading} onRefresh={fetchHistory} currentUser={currentUser} currentLang={language} t={t} onDelete={handleDeleteClick} />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeMenu === 'sender' && (
+                                    <BulkSenderPage t={t} setAlert={setAlert} />
+                                )}
+
+                                {activeMenu === 'messenger' && (
+                                    <div className="flex-1 h-full w-full overflow-hidden">
+                                        <MessengerPage t={t} />
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
