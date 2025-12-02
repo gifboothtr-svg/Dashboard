@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Smile Zone Health Panel</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -15,6 +14,8 @@
                         brand: {
                             50: '#f0f9ff',
                             100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
                             400: '#38bdf8',
                             500: '#0ea5e9',
                             600: '#0284c7',
@@ -23,9 +24,10 @@
                             900: '#0c4a6e',
                         },
                         chat: {
-                            bg: '#EFEAE2',
-                            outgoing: '#D9FDD3',
-                            incoming: '#FFFFFF',
+                            bg: '#f0f9ff',
+                            outgoing: '#e0f2fe',
+                            incoming: '#ffffff',
+                            bubble_shadow: '0 1px 0.5px rgba(12, 74, 110, .05)',
                         }
                     },
                     fontFamily: {
@@ -36,20 +38,15 @@
         }
     </script>
     
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- SheetJS (XLSX) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 
     <style>
@@ -67,7 +64,6 @@
             height: 100%;
         }
 
-        /* Özel Scrollbar Tasarımı */
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -81,89 +77,31 @@
 
         .blur-content { filter: blur(5px); pointer-events: none; user-select: none; }
 
-        .chat-bg {
-            background-color: #e5e7eb;
-            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        .chat-bg-pattern {
+            background-color: #f0f9ff;
+            background-image: radial-gradient(#bae6fd 0.5px, transparent 0.5px), radial-gradient(#bae6fd 0.5px, #f0f9ff 0.5px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            opacity: 0.3;
+        }
+        
+        .msg-tail-in {
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, 10px 0);
         }
 
-        /* Loading / Processing Animations */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
         @keyframes fillUp { 0% { height: 0%; } 100% { height: 100%; } }
         @keyframes dash { to { stroke-dashoffset: 0; } }
-        @keyframes progressBar { 0% { width: 0%; } 100% { width: 100%; } }
-
-        /* --- 3D SCATTER CUBE ANIMATION --- */
-        .scene-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            perspective: 800px;
-            width: 100%;
-            height: 100%;
-            min-height: 200px;
-        }
-        .cube-group {
-            position: relative;
-            width: 0;
-            height: 0;
-            transform-style: preserve-3d;
-            animation: rotateGroup 10s linear infinite;
-        }
-        @keyframes rotateGroup {
-            from { transform: rotateY(0deg) rotateX(20deg); }
-            to { transform: rotateY(360deg) rotateX(20deg); }
-        }
-        .voxel {
-            position: absolute;
-            width: 14px;
-            height: 14px;
-            transform-style: preserve-3d;
-            /* Start Position: Grid layout based on CSS vars */
-            transform: translate3d(calc(var(--x) * 14px), calc(var(--y) * 14px), calc(var(--z) * 14px));
-            animation: explode 5s ease-in-out infinite;
-        }
-        /* Cube Faces */
-        .face {
-            position: absolute;
-            width: 14px;
-            height: 14px;
-            background-color: #0ea5e9; /* brand-500 */
-            border: 1px solid rgba(255,255,255,0.4);
-            border-radius: 3px; /* Hafif yuvarlak hat */
-            opacity: 0.85;
-            backface-visibility: hidden;
-        }
-        /* Top face lighter, bottom darker for simple shading */
-        .face.top { background-color: #38bdf8; } 
-        .face.bottom { background-color: #0284c7; }
-
-        .face.front  { transform: translateZ(7px); }
-        .face.back   { transform: rotateY(180deg) translateZ(7px); }
-        .face.right  { transform: rotateY(90deg) translateZ(7px); }
-        .face.left   { transform: rotateY(-90deg) translateZ(7px); }
-        .face.top    { transform: rotateX(90deg) translateZ(7px); }
-        .face.bottom { transform: rotateX(-90deg) translateZ(7px); }
-
-        @keyframes explode {
-            0%, 45% {
-                /* Assembled state */
-                transform: translate3d(calc(var(--x) * 14px), calc(var(--y) * 14px), calc(var(--z) * 14px));
-                opacity: 1;
-            }
-            50% {
-                /* Anticipation / Shake */
-                transform: translate3d(calc(var(--x) * 14.5px), calc(var(--y) * 14.5px), calc(var(--z) * 14.5px)) rotate(2deg);
-            }
-            70% {
-                /* Explode and Fall */
-                transform: translate3d(calc(var(--dx) * 1px), calc(var(--dy) * 1px), calc(var(--dz) * 1px)) rotateX(calc(var(--rx) * 1deg)) rotateY(calc(var(--ry) * 1deg));
-                opacity: 0.8;
-            }
-            85%, 100% {
-                /* Fade out on floor */
-                transform: translate3d(calc(var(--dx) * 1.5px), calc(var(--dy) * 1.5px), calc(var(--dz) * 1.5px)) rotateX(calc(var(--rx) * 1deg));
-                opacity: 0;
-            }
+        @keyframes shimmer { 
+            0% { transform: translateX(-100%); } 
+            100% { transform: translateX(100%); } 
         }
     </style>
 </head>
@@ -177,237 +115,36 @@
         const WEBHOOK_URL = "https://8ixs09rp.rpcld.app/webhook/leads-upload";
         const DELETE_WEBHOOK_URL = "https://8ixs09rp.rpcld.app/webhook/leads-delete"; 
         const SENDER_WEBHOOK_URL = "https://8ixs09rp.rpcld.app/webhook/toplu";
-        // Messenger Webhook'ları
         const SEND_MESSAGE_WEBHOOK = "https://8ixs09rp.rpcld.app/webhook/manuel-outbound";
         const TOGGLE_AI_WEBHOOK = "https://8ixs09rp.rpcld.app/webhook/toggle-ai";
 
         const SUPABASE_URL = "https://qzvrktwfwragkqnxktpk.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dnJrdHdmd3JhZ2txbnhrdHBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjgwNTQsImV4cCI6MjA3OTc0NDA1NH0.iAzrWjs-IWZ2eoaAfmOL5XSSimUWRxXEkg225xGIt2U";
         
-        // Tablo İsimleri
         const TABLE_NAME = "raw_imports";
         const LEADS_TABLE_NAME = "leads"; 
         const MESSAGES_TABLE = "conversations"; 
         const ACTIVE_CHATS_TABLE = "active_chats"; 
+        const SENDER_STATE_TABLE = "sender_state"; // Yeni tablo adı
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- TRANSLATIONS ---
         const TRANSLATIONS = {
             tr: {
-                loginTitle: "Giriş Yap",
-                username: "Kullanıcı Adı",
-                password: "Şifre",
-                loginBtn: "Giriş Yap",
-                invalidLogin: "Geçersiz kullanıcı adı veya şifre",
-                usernamePlaceholder: "Kullanıcı adınızı girin",
-                passwordPlaceholder: "••••••",
-                
-                menuLeads: "Veri Yükleme",
-                menuSender: "Mesaj Gönderici",
-                menuMessenger: "Messenger",
-                loggedInAs: "Giriş Yapan",
-                logout: "Çıkış Yap",
-                
-                pageTitle: "Veri Yükleme",
-                pageSubtitle: "Toplu müşteri verisi yükleme ve takip paneli.",
-                downloadTemplate: "Şablon İndir",
-                templateDownloaded: "Şablon başarıyla indirildi!",
-                templateError: "Şablon oluşturulamadı.",
-                filterUser: "Kullanıcı Filtrele",
-                allUsers: "Tüm Kullanıcılar",
-                dashboardStats: "Panel İstatistikleri",
-                statTotal: "Toplam",
-                statSuccess: "Başarılı",
-                statExist: "Mevcut",
-                statDuplicate: "Tekrar",
-                statError: "Hata",
-                uploadTitle: "Dosya Yükle",
-                labelUser: "Kullanıcı Adı",
-                labelUserPlaceholder: "Kim yüklüyor?",
-                labelCampaign: "Kampanya Adı",
-                labelCampaignOptional: "(İsteğe bağlı)",
-                labelCampaignPlaceholder: "Örn: Yaz Kampanyası 2025",
-                dropText: "Dosyayı buraya sürükleyin",
-                dropSubtext: "CSV veya Excel dosyaları desteklenir (Max 5MB)",
-                selectBtn: "Bilgisayardan Seç",
-                errorNoUser: "Lütfen bir Kullanıcı Adı girin.",
-                errorNoAmount: "Lütfen geçerli bir miktar giriniz.",
-                processingVerifying: "Doğrulanıyor...",
-                processingUploading: "Veri Yükleniyor...",
-                processingVerifyDesc: "Kayıtlar veritabanı ile doğrulanıyor.",
-                processingUploadDesc: "Dosyanız Smile Zone sunucularına güvenli bir şekilde iletiliyor.",
-                reportTitle: "Yükleme Tamamlandı",
-                reportFile: "Dosya",
-                reportUploader: "Yükleyen",
-                reportCampaign: "Kampanya",
-                historyTitle: "Yükleme Geçmişi",
-                historyRecords: "kayıt",
-                refreshTooltip: "Tabloyu Yenile",
-                colFile: "Dosya Detayları",
-                colUserCampaign: "Kullanıcı / Kampanya",
-                colTotal: "Toplam",
-                colSuccess: "Başarılı",
-                colExist: "Mevcut",
-                colDuplicate: "Tekrar",
-                colError: "Hata",
-                colStatus: "Durum",
-                colActions: "İşlem",
-                statusCompleted: "Tamamlandı",
-                statusUntitled: "İsimsiz",
-                statusAnon: "Anonim",
-                historyLoading: "Veriler yükleniyor...",
-                historyEmptyTitle: "Kayıt bulunamadı.",
-                historyEmptyDesc: "Yükleme geçmişiniz burada görünecektir.",
-                historyFetchError: "Geçmiş verileri alınamadı.",
-                msgSentChecking: "Dosya gönderildi. Veritabanı kontrol ediliyor...",
-                msgRequestChecking: "İstek gönderildi. Veritabanı kontrol ediliyor...",
-                msgNetworkError: "Ağ bağlantısı koptu.",
-                msgDeleted: "Kayıt ve ilgili veriler silinmek üzere işaretlendi.",
-                msgDeleteError: "Silme işlemi başarısız oldu.",
-                deleteTitle: "Kaydı ve Verileri Sil",
-                deleteConfirm: "Bu dosyayı ve içinden yüklenen TÜM verileri silmek istediğinize emin misiniz?",
-                deleteWarning: "Bu işlem geri alınamaz.",
-                deleteBtn: "Sil",
-                deletingBtn: "Siliniyor...",
-                cancelBtn: "İptal",
-
-                senderTitle: "Toplu Mesaj Gönderici",
-                senderSubtitle: "Otomatik kampanya mesajlaşma paneli.",
-                senderStartBtn: "Başlat",
-                senderStopBtn: "Durdur",
-                senderStatusSent: "Gönderildi",
-                senderStatusDelivered: "İletildi",
-                senderStatusRead: "Okundu",
-                senderStatusError: "Hata",
-                senderLogTitle: "Canlı Gönderim Akışı",
-                senderLogWaiting: "Sistem bekleniyor...",
-                senderLogRunning: "Sistem çalışıyor...",
-                senderDailyTitle: "Son Gönderim",
-                senderTotalTitle: "Genel Toplam (Tüm Zamanlar)",
-                targetAmount: "Miktar",
-
-                foldersTitle: "Sohbetler",
-                searchPlaceholder: "Sohbetlerde ara...",
-                typeMessage: "Bir mesaj yazın...",
-                online: "Çevrimiçi",
-                lastSeen: "Son görülme",
-                modeAuto: "Otomatik",
-                modeManual: "Manuel",
-                selectChat: "Sohbet Seçin",
-                selectChatDesc: "Görüşmeye başlamak için soldaki listeden bir sohbet seçin.",
-                sending: "Gönderiliyor..."
+                loginTitle: "Giriş Yap", username: "Kullanıcı Adı", password: "Şifre", loginBtn: "Giriş Yap", invalidLogin: "Geçersiz kullanıcı adı veya şifre", usernamePlaceholder: "Kullanıcı adınızı girin", passwordPlaceholder: "••••••", menuLeads: "Veri Yükleme", menuSender: "Mesaj Gönderici", menuMessenger: "Messenger", loggedInAs: "Giriş Yapan", logout: "Çıkış Yap", pageTitle: "Veri Yükleme", pageSubtitle: "Toplu müşteri verisi yükleme ve takip paneli.", downloadTemplate: "Şablon İndir", templateDownloaded: "Şablon başarıyla indirildi!", templateError: "Şablon oluşturulamadı.", filterUser: "Kullanıcı Filtrele", allUsers: "Tüm Kullanıcılar", dashboardStats: "Panel İstatistikleri", statTotal: "Toplam", statSuccess: "Başarılı", statExist: "Mevcut", statDuplicate: "Tekrar", statError: "Hata", uploadTitle: "Dosya Yükle", labelUser: "Kullanıcı Adı", labelUserPlaceholder: "Kim yüklüyor?", labelCampaign: "Kampanya Adı", labelCampaignOptional: "(İsteğe bağlı)", labelCampaignPlaceholder: "Örn: Yaz Kampanyası 2025", dropText: "Dosyayı buraya sürükleyin", dropSubtext: "CSV veya Excel dosyaları desteklenir (Max 5MB)", selectBtn: "Bilgisayardan Seç", errorNoUser: "Lütfen bir Kullanıcı Adı girin.", errorNoAmount: "Lütfen geçerli bir miktar giriniz.", processingVerifying: "Doğrulanıyor...", processingUploading: "Veri Yükleniyor...", processingVerifyDesc: "Kayıtlar veritabanı ile doğrulanıyor.", processingUploadDesc: "Dosyanız Smile Zone sunucularına güvenli bir şekilde iletiliyor.", reportTitle: "Yükleme Tamamlandı", reportFile: "Dosya", reportUploader: "Yükleyen", reportCampaign: "Kampanya", historyTitle: "Yükleme Geçmişi", historyRecords: "kayıt", refreshTooltip: "Tabloyu Yenile", colFile: "Dosya Detayları", colUserCampaign: "Kullanıcı / Kampanya", colTotal: "Toplam", colSuccess: "Başarılı", colExist: "Mevcut", colDuplicate: "Tekrar", colError: "Hata", colStatus: "Durum", colActions: "İşlem", statusCompleted: "Tamamlandı", statusUntitled: "İsimsiz", statusAnon: "Anonim", historyLoading: "Veriler yükleniyor...", historyEmptyTitle: "Kayıt bulunamadı.", historyEmptyDesc: "Yükleme geçmişiniz burada görünecektir.", historyFetchError: "Geçmiş verileri alınamadı.", msgSentChecking: "Dosya gönderildi. Veritabanı kontrol ediliyor...", msgRequestChecking: "İstek gönderildi. Veritabanı kontrol ediliyor...", msgNetworkError: "Ağ bağlantısı koptu.", msgDeleted: "Kayıt ve ilgili veriler silinmek üzere işaretlendi.", msgDeleteError: "Silme işlemi başarısız oldu.", deleteTitle: "Kaydı ve Verileri Sil", deleteConfirm: "Bu dosyayı ve içinden yüklenen TÜM verileri silmek istediğinize emin misiniz?", deleteWarning: "Bu işlem geri alınamaz.", deleteBtn: "Sil", deletingBtn: "Siliniyor...", cancelBtn: "İptal", senderTitle: "Toplu Mesaj Gönderici", senderSubtitle: "Otomatik kampanya mesajlaşma paneli.", senderStartBtn: "Başlat", senderStopBtn: "Durdur", senderStatusSent: "Gönderildi", senderStatusDelivered: "İletildi", senderStatusRead: "Okundu", senderStatusError: "Hata", senderStatusReplied: "Cevaplanan", senderReady: "Hazır", senderLogTitle: "Canlı Gönderim Akışı", senderLogWaiting: "Sistem bekleniyor...", senderLogRunning: "Sistem çalışıyor...", senderDailyTitle: "Son Gönderim", senderTotalTitle: "Genel Toplam (Tüm Zamanlar)", targetAmount: "Miktar", foldersTitle: "Sohbetler", searchPlaceholder: "Sohbetlerde ara...", typeMessage: "Bir mesaj yazın...", online: "Çevrimiçi", lastSeen: "Son görülme", modeAuto: "Otomatik", modeManual: "Manuel", selectChat: "Sohbet Seçin", selectChatDesc: "Görüşmeye başlamak için soldaki listeden bir sohbet seçin.", sending: "Gönderiliyor...", systemActive: "Sistem Aktif", systemWaiting: "Sistem Bekliyor", estimatedDuration: "Tahmini Süre", elapsedTime: "Geçen Süre", remainingTime: "Kalan Süre", processCompleted: "İşlem Tamamlandı", totalRecord: "Toplam Kayıt",
+                catOpen: "Diğer Açık Sohbetler", catPending: "Teklif Bekleyenler", catHot: "Sıcak", catWarm: "İlgili", catCold: "Soğuk"
             },
             en: {
-                loginTitle: "Login",
-                username: "Username",
-                password: "Password",
-                loginBtn: "Login",
-                invalidLogin: "Invalid username or password",
-                usernamePlaceholder: "Enter your username",
-                passwordPlaceholder: "••••••",
-                menuLeads: "Leads Importer",
-                menuSender: "Bulk Sender",
-                menuMessenger: "Messenger",
-                loggedInAs: "Logged in as",
-                logout: "Logout",
-                pageTitle: "Leads Importer",
-                pageSubtitle: "Bulk customer data upload and tracking panel.",
-                downloadTemplate: "Download Template",
-                templateDownloaded: "Template downloaded successfully!",
-                templateError: "Failed to generate template.",
-                filterUser: "Filter User",
-                allUsers: "All Users",
-                dashboardStats: "Dashboard Stats",
-                statTotal: "Total Rows",
-                statSuccess: "Success",
-                statExist: "Exist",
-                statDuplicate: "Duplicate",
-                statError: "Error",
-                uploadTitle: "Upload File",
-                labelUser: "User Name",
-                labelUserPlaceholder: "Who is uploading?",
-                labelCampaign: "Campaign Name",
-                labelCampaignOptional: "(Optional)",
-                labelCampaignPlaceholder: "e.g. Summer Campaign 2025",
-                dropText: "Drag & drop file here",
-                dropSubtext: "Supports CSV or Excel files (Max 5MB)",
-                selectBtn: "Select from Computer",
-                errorNoUser: "Please enter a User Name.",
-                errorNoAmount: "Please enter a valid amount.",
-                processingVerifying: "Verifying...",
-                processingUploading: "Uploading Data...",
-                processingVerifyDesc: "Records are being verified with the database.",
-                processingUploadDesc: "Your file is being securely transmitted to Smile Zone servers.",
-                reportTitle: "Upload Complete",
-                reportFile: "File",
-                reportUploader: "Uploaded by",
-                reportCampaign: "Campaign",
-                historyTitle: "Upload History",
-                historyRecords: "records",
-                refreshTooltip: "Refresh Table",
-                colFile: "File Details",
-                colUserCampaign: "User / Campaign",
-                colTotal: "Total",
-                colSuccess: "Success",
-                colExist: "Exist",
-                colDuplicate: "Duplicate",
-                colError: "Error",
-                colStatus: "Status",
-                colActions: "Action",
-                statusCompleted: "Completed",
-                statusUntitled: "Untitled",
-                statusAnon: "Anonymous",
-                historyLoading: "Loading data...",
-                historyEmptyTitle: "No records found.",
-                historyEmptyDesc: "Your upload history will appear here.",
-                historyFetchError: "Failed to fetch history.",
-                msgSentChecking: "File sent. Checking database...",
-                msgRequestChecking: "Request sent. Checking database...",
-                msgNetworkError: "Network connection lost.",
-                msgDeleted: "Record and related data marked for deletion.",
-                msgDeleteError: "Failed to delete record.",
-                deleteTitle: "Delete Record & Data",
-                deleteConfirm: "Are you sure you want to delete this file and ALL data imported from it?",
-                deleteWarning: "This action cannot be undone.",
-                deleteBtn: "Delete",
-                deletingBtn: "Deleting...",
-                cancelBtn: "Cancel",
-                senderTitle: "Bulk Message Sender",
-                senderSubtitle: "Automated campaign messaging dashboard.",
-                senderStartBtn: "Start",
-                senderStopBtn: "Stop",
-                senderStatusSent: "Sent",
-                senderStatusDelivered: "Delivered",
-                senderStatusRead: "Read",
-                senderStatusError: "Error",
-                senderLogTitle: "Live Transmission Log",
-                senderLogWaiting: "System idle...",
-                senderLogRunning: "System running...",
-                senderDailyTitle: "Last Sending",
-                senderTotalTitle: "Lifetime Total",
-                targetAmount: "Amount",
-                foldersTitle: "Chats",
-                searchPlaceholder: "Search chats...",
-                typeMessage: "Type a message...",
-                online: "Online",
-                lastSeen: "Last seen",
-                modeAuto: "Auto",
-                modeManual: "Manual",
-                selectChat: "Select Chat",
-                selectChatDesc: "Select a chat from the left list to start messaging.",
-                sending: "Sending..."
+                loginTitle: "Login", username: "Username", password: "Password", loginBtn: "Login", invalidLogin: "Invalid username or password", usernamePlaceholder: "Enter your username", passwordPlaceholder: "••••••", menuLeads: "Leads Importer", menuSender: "Bulk Sender", menuMessenger: "Messenger", loggedInAs: "Logged in as", logout: "Logout", pageTitle: "Leads Importer", pageSubtitle: "Bulk customer data upload and tracking panel.", downloadTemplate: "Download Template", templateDownloaded: "Template downloaded successfully!", templateError: "Failed to generate template.", filterUser: "Filter User", allUsers: "All Users", dashboardStats: "Dashboard Stats", statTotal: "Total Rows", statSuccess: "Success", statExist: "Exist", statDuplicate: "Duplicate", statError: "Error", uploadTitle: "Upload File", labelUser: "User Name", labelUserPlaceholder: "Who is uploading?", labelCampaign: "Campaign Name", labelCampaignOptional: "(Optional)", labelCampaignPlaceholder: "e.g. Summer Campaign 2025", dropText: "Drag & drop file here", dropSubtext: "Supports CSV or Excel files (Max 5MB)", selectBtn: "Select from Computer", errorNoUser: "Please enter a User Name.", errorNoAmount: "Please enter a valid amount.", processingVerifying: "Verifying...", processingUploading: "Uploading Data...", processingVerifyDesc: "Records are being verified with the database.", processingUploadDesc: "Your file is being securely transmitted to Smile Zone servers.", reportTitle: "Upload Complete", reportFile: "File", reportUploader: "Uploaded by", reportCampaign: "Campaign", historyTitle: "Upload History", historyRecords: "records", refreshTooltip: "Refresh Table", colFile: "File Details", colUserCampaign: "User / Campaign", colTotal: "Total", colSuccess: "Success", colExist: "Exist", colDuplicate: "Duplicate", colError: "Error", colStatus: "Status", colActions: "Action", statusCompleted: "Completed", statusUntitled: "Untitled", statusAnon: "Anonymous", historyLoading: "Loading data...", historyEmptyTitle: "No records found.", historyEmptyDesc: "Your upload history will appear here.", historyFetchError: "Failed to fetch history.", msgSentChecking: "File sent. Checking database...", msgRequestChecking: "Request sent. Checking database...", msgNetworkError: "Network connection lost.", msgDeleted: "Record and related data marked for deletion.", msgDeleteError: "Failed to delete record.", deleteTitle: "Delete Record & Data", deleteConfirm: "Are you sure you want to delete this file and ALL data imported from it?", deleteWarning: "This action cannot be undone.", deleteBtn: "Delete", deletingBtn: "Deleting...", cancelBtn: "Cancel", senderTitle: "Bulk Message Sender", senderSubtitle: "Automated campaign messaging dashboard.", senderStartBtn: "Start", senderStopBtn: "Stop", senderStatusSent: "Sent", senderStatusDelivered: "Delivered", senderStatusRead: "Read", senderStatusError: "Error", senderStatusReplied: "Replied", senderReady: "Ready", senderLogTitle: "Live Transmission Log", senderLogWaiting: "System idle...", senderLogRunning: "System running...", senderDailyTitle: "Last Sending", senderTotalTitle: "Lifetime Total", targetAmount: "Amount", foldersTitle: "Chats", searchPlaceholder: "Search chats...", typeMessage: "Type a message...", online: "Online", lastSeen: "Last seen", modeAuto: "Auto", modeManual: "Manual", selectChat: "Select Chat", selectChatDesc: "Select a chat from the left list to start messaging.", sending: "Sending...", systemActive: "System Active", systemWaiting: "System Waiting", estimatedDuration: "Estimated Duration", elapsedTime: "Elapsed Time", remainingTime: "Remaining Time", processCompleted: "Process Completed", totalRecord: "Total Records",
+                catOpen: "Other Open", catPending: "Offer Pending", catHot: "Hot", catWarm: "Warm", catCold: "Cold"
             }
         };
 
-        // --- MOCK USERS ---
         const MOCK_USERS = [
             { id: 1, user_name: 'admin', password: 'admin', role: 'admin' },
             { id: 2, user_name: 'Burak', password: '123456', role: 'user' },
             { id: 3, user_name: 'Fırat', password: '654321', role: 'user' }
         ];
-
-        // --- HELPER COMPONENTS ---
 
         function Icon({ name, className }) {
             const elementRef = useRef(null);
@@ -424,9 +161,57 @@
             return <span ref={elementRef} className="inline-flex items-center justify-center"></span>;
         }
 
+        function SmileLogoAnimation({ isRunning, t, progressData }) {
+            const animState = isRunning ? 'running' : 'paused';
+            const formatTime = (seconds) => {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            };
+            return (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-black text-slate-100 overflow-hidden font-sans relative">
+                  <div className="scene-container">
+                    <div className="layer-wrapper layer-back-anim" style={{ animationPlayState: animState }}><div className="cross-shape rotated-cross"><div className="bar horizontal" /><div className="bar vertical" /></div></div>
+                    <div className="layer-wrapper layer-front-anim" style={{ animationPlayState: animState }}><div className="cross-shape straight-cross"><div className="bar horizontal" /><div className="bar vertical" /></div></div>
+                    <div className="layer-wrapper layer-smile-anim" style={{ animationPlayState: animState }}><div className="smile-shape" /></div>
+                    <div className="floor-glow" style={{ animationPlayState: animState }} />
+                  </div>
+                  <div className="mt-8 text-center space-y-4 opacity-100 z-10 flex flex-col items-center">
+                    <div className="animate-fade-in transform hover:scale-105 transition-transform duration-500"><svg viewBox="0 0 300 80" className="h-16 w-auto drop-shadow-[0_0_15px_rgba(14,165,233,0.3)]" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 30H30V15C30 12.2386 32.2386 10 35 10H45C47.7614 10 50 12.2386 50 15V30H65C67.7614 30 70 32.2386 70 35V45C70 47.7614 67.7614 50 65 50H50V65C50 67.7614 47.7614 70 45 70H35C32.2386 70 30 67.7614 30 65V50H15C12.2386 50 10 47.7614 10 45V35C10 32.2386 12.2386 30 15 30Z" fill="#0099FF"/><path d="M30 42C30 42 35 48 40 48C45 48 50 42 50 42" stroke="white" strokeWidth="4" strokeLinecap="round"/><text x="85" y="40" fontFamily="Poppins, sans-serif" fontWeight="bold" fontSize="28" fill="white" style={{textShadow: "0 0 10px rgba(255,255,255,0.3)"}}>SMILE ZONE</text><text x="85" y="62" fontFamily="Poppins, sans-serif" fontWeight="bold" fontSize="20" fill="white" letterSpacing="0.05em" opacity="0.8">TURKEY</text><rect x="78" y="15" width="2" height="50" fill="#0099FF"/></svg></div>
+                    <p className={`text-sm tracking-widest uppercase font-semibold transition-colors duration-500 ${isRunning ? 'text-green-400 animate-pulse' : 'text-slate-400'}`}>{isRunning ? t.systemActive : t.systemWaiting}</p>
+                  </div>
+                  {isRunning && progressData && (
+                      <div className="absolute bottom-0 left-0 w-full bg-black/80 border-t border-cyan-900/50 backdrop-blur-md p-4 animate-fade-in z-20">
+                          <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden mb-4 relative"><div className="h-full bg-cyan-50 shadow-[0_0_15px_#06b6d4] transition-all duration-1000 ease-linear relative overflow-hidden" style={{ width: `${Math.min((progressData.elapsed / progressData.total) * 100, 100)}%` }}><div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]"></div></div></div>
+                          <div className="grid grid-cols-3 gap-2 text-center"><div className="flex flex-col"><span className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">{t.totalRecord}</span><span className="text-xl font-bold text-slate-100">{progressData.targetCount}</span></div><div className="flex flex-col border-l border-slate-700/50"><span className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">{t.elapsedTime}</span><span className="text-xl font-bold text-cyan-400 font-mono tracking-wide">{formatTime(progressData.elapsed)}</span></div><div className="flex flex-col border-l border-slate-700/50"><span className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">{t.remainingTime}</span><span className="text-xl font-bold text-slate-100 font-mono tracking-wide">{formatTime(Math.max(0, progressData.total - progressData.elapsed))}</span></div></div>
+                      </div>
+                  )}
+                  <style>{` .scene-container { position: relative; width: 250px; height: 250px; perspective: 1000px; transform-style: preserve-3d; } .layer-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transform-style: preserve-3d; } .bar { position: absolute; border-radius: 12px; } .cross-shape { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.5)); } .horizontal { width: 130px; height: 30px; top: 50%; left: 50%; transform: translate(-50%, -50%); } .vertical { width: 30px; height: 130px; top: 50%; left: 50%; transform: translate(-50%, -50%); } .rotated-cross { transform: translateZ(-25px) rotate(45deg); } .rotated-cross .bar { background-color: #0060ad; background: linear-gradient(135deg, #0078ff, #00509e); } .straight-cross { transform: translateZ(25px) rotate(0deg); } .straight-cross .bar { background-color: #00aaff; background: linear-gradient(135deg, #00d2ff, #008ecc); } .smile-shape { width: 28px; height: 16px; background-color: transparent; border-bottom: 3px solid #ffffff; border-left: 1px solid transparent; border-right: 1px solid transparent; border-radius: 0 0 50% 50%; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.8)); transform: translateY(-2px) translateZ(40px); } .layer-back-anim { animation: anim-back 5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite; } @keyframes anim-back { 0% { transform: translateZ(-600px) rotateZ(-90deg) scale(0.2); } 20% { transform: translateZ(-25px) rotateZ(0deg) scale(1); } 75% { transform: translateZ(-25px) rotateZ(5deg) scale(1); } 100% { transform: translateZ(-600px) rotateZ(90deg) scale(0.2); } } .layer-front-anim { animation: anim-front 5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite; } @keyframes anim-front { 0% { transform: translateZ(600px) rotateZ(90deg) scale(0.2); } 25% { transform: translateZ(25px) rotateZ(0deg) scale(1); } 75% { transform: translateZ(25px) rotateZ(5deg) scale(1); } 100% { transform: translateZ(600px) rotateZ(-90deg) scale(0.2); } } .layer-smile-anim { animation: anim-smile 5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite; } @keyframes anim-smile { 0% { transform: translateY(100px) translateZ(200px) scale(0); } 30% { transform: translateY(0) translateZ(40px) scale(1); } 75% { transform: translateY(0) translateZ(40px) rotateZ(5deg); } 100% { transform: translateY(100px) translateZ(200px) scale(0); } } .floor-glow { position: absolute; width: 250px; height: 250px; background: radial-gradient(circle, rgba(0, 200, 255, 0.4) 0%, transparent 70%); transform: translateZ(-150px); animation: pulse-glow 5s ease-in-out infinite; } @keyframes pulse-glow { 0%, 100% { transform: translateZ(-150px) scale(0.5); opacity: 0.5; } 50% { transform: translateZ(-150px) scale(1.1); opacity: 1; } } `}</style>
+                </div>
+            );
+        }
+
+        function ImageViewer({ src, onClose, t }) {
+            if (!src) return null;
+            return (
+                <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center animate-fade-in p-4">
+                    <div className="absolute top-4 right-4 flex gap-4">
+                        <a href={src} download="image.jpg" target="_blank" className="p-2 bg-white/10 rounded-full hover:bg-white/20 text-white transition-colors" title="Download">
+                             <Icon name="download" className="w-6 h-6" />
+                        </a>
+                        <button onClick={onClose} className="p-2 bg-white/10 rounded-full hover:bg-white/20 text-white transition-colors">
+                             <Icon name="x" className="w-6 h-6" />
+                        </button>
+                    </div>
+                    <img src={src} className="max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl" alt="Full view" />
+                </div>
+            );
+        }
+
         function SmileZoneLogo() {
             return (
                 <svg viewBox="0 0 300 80" className="h-14 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Hatalı path dizesi düzeltildi */}
                     <path d="M15 30H30V15C30 12.2386 32.2386 10 35 10H45C47.7614 10 50 12.2386 50 15V30H65C67.7614 30 70 32.2386 70 35V45C70 47.7614 67.7614 50 65 50H50V65C50 67.7614 47.7614 70 45 70H35C32.2386 70 30 67.7614 30 65V50H15C12.2386 50 10 47.7614 10 45V35C10 32.2386 12.2386 30 15 30Z" fill="#0099FF"/>
                     <path d="M30 42C30 42 35 48 40 48C45 48 50 42 50 42" stroke="white" strokeWidth="4" strokeLinecap="round"/>
                     <text x="85" y="40" fontFamily="Poppins, sans-serif" fontWeight="bold" fontSize="28" fill="#0099FF">SMILE ZONE</text>
@@ -505,65 +290,12 @@
             );
         }
 
-        // --- CUBE LOADER ANIMATION ---
-        function CubeLoader({ t, isSending }) {
-            const cubes = useMemo(() => {
-                let c = [];
-                for(let x=-1; x<=1; x++) {
-                    for(let y=-1; y<=1; y++) {
-                        for(let z=-1; z<=1; z++) {
-                            c.push({
-                                x, y, z,
-                                dx: (Math.random() - 0.5) * 250, 
-                                dy: 150 + Math.random() * 100, 
-                                dz: (Math.random() - 0.5) * 250,
-                                rx: Math.random() * 720,
-                                ry: Math.random() * 720,
-                                delay: Math.random() * 0.1 
-                            });
-                        }
-                    }
-                }
-                return c;
-            }, []);
-
-            const animState = isSending ? 'running' : 'paused';
-
-            return (
-                <div className="scene-container">
-                    <div className="cube-group" style={{ animationPlayState: animState }}>
-                        {cubes.map((c, i) => (
-                            <div key={i} className="voxel" style={{
-                                '--x': c.x, '--y': c.y, '--z': c.z,
-                                '--dx': c.dx, '--dy': c.dy, '--dz': c.dz,
-                                '--rx': c.rx, '--ry': c.ry,
-                                animationDelay: `${c.delay}s`,
-                                animationPlayState: animState
-                            }}>
-                                <div className="face front"></div>
-                                <div className="face back"></div>
-                                <div className="face right"></div>
-                                <div className="face left"></div>
-                                <div className="face top"></div>
-                                <div className="face bottom"></div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className={`mt-12 text-brand-600 font-bold text-sm tracking-widest uppercase ${isSending ? 'animate-pulse' : ''}`}>
-                        {isSending ? t.senderLogRunning : t.senderLogWaiting}
-                    </div>
-                </div>
-            )
-        }
-
-        // --- STATS COMPONENTS ---
-
         function PastelStatsGrid({ title, data, icon, t }) {
-            return (
+             return (
                 <div className="mb-8 animate-fade-in w-full">
-                    {title && <div className="flex items-center gap-2 mb-4"><h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">{icon && <Icon name={icon} className="w-5 h-5 text-gray-500" />}{title}</h2></div>}
+                    {title && <div className="flex items-center gap-2 mb-4"><h2 className="text-lg font-semibold text-brand-600 flex items-center gap-2">{icon && <Icon name={icon} className="w-5 h-5 text-gray-500" />}{title}</h2></div>}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                        {data.total !== undefined ? (
+                        {data.total !== undefined && data.sent === undefined ? (
                             <>
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-gray-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.statTotal}</h3><div className="p-2 bg-gray-50 rounded-lg text-gray-400 group-hover:bg-gray-100 transition-colors"><Icon name="database" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-gray-800">{data.total.toLocaleString()}</p></div>
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-green-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-green-600/70 uppercase tracking-wider">{t.statSuccess}</h3><div className="p-2 bg-green-50 rounded-lg text-green-600"><Icon name="check-circle-2" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-green-600">{data.success.toLocaleString()}</p></div>
@@ -573,10 +305,11 @@
                             </>
                         ) : (
                             <>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-gray-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t.statTotal}</h3><div className="p-2 bg-gray-50 rounded-lg text-gray-500 group-hover:bg-gray-100 transition-colors"><Icon name="layers" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-gray-700">{data.total?.toLocaleString() || 0}</p></div>
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-blue-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-blue-600/70 uppercase tracking-wider">{t.senderStatusSent}</h3><div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors"><Icon name="send" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-blue-700">{data.sent.toLocaleString()}</p></div>
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-green-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-green-600/70 uppercase tracking-wider">{t.senderStatusDelivered}</h3><div className="p-2 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-100 transition-colors"><Icon name="check" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-green-600">{data.delivered.toLocaleString()}</p></div>
                                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-purple-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-purple-600/70 uppercase tracking-wider">{t.senderStatusRead}</h3><div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors"><Icon name="check-check" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-purple-700">{data.read.toLocaleString()}</p></div>
-                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-red-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-red-600/70 uppercase tracking-wider">{t.senderStatusError}</h3><div className="p-2 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-100 transition-colors"><Icon name="alert-circle" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-red-600">{data.error.toLocaleString()}</p></div>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 stat-card group hover:border-red-200"><div className="flex items-center justify-between mb-3"><h3 className="text-xs font-bold text-red-600/70 uppercase tracking-wider">{t.senderStatusError}</h3><div className="p-2 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-100 transition-colors"><Icon name="alert-triangle" className="w-5 h-5" /></div></div><p className="text-2xl font-bold text-red-600">{data.error.toLocaleString()}</p></div>
                             </>
                         )}
                     </div>
@@ -585,35 +318,57 @@
         }
 
         function PremiumStatsBar({ title, data, icon, t }) {
+            // Updated PremiumStatsBar for better visual separation and distinct colors
+            const statsConfig = [
+                { key: 'total', label: t.statTotal, icon: 'layers', colorClass: 'bg-white/20 text-white', valueClass: 'text-white' },
+                { key: 'sent', label: t.senderStatusSent, icon: 'send', colorClass: 'bg-blue-400/20 text-blue-100', valueClass: 'text-blue-50' },
+                { key: 'delivered', label: t.senderStatusDelivered, icon: 'check', colorClass: 'bg-green-400/20 text-green-100', valueClass: 'text-green-50' },
+                { key: 'read', label: t.senderStatusRead, icon: 'check-check', colorClass: 'bg-purple-400/20 text-purple-100', valueClass: 'text-purple-50' },
+                { key: 'error', label: t.senderStatusError, icon: 'alert-circle', colorClass: 'bg-red-400/20 text-red-100', valueClass: 'text-red-50' },
+                { key: 'replied', label: t.senderStatusReplied, icon: 'message-circle', colorClass: 'bg-cyan-400/20 text-cyan-100', valueClass: 'text-cyan-50' },
+            ];
+
             return (
-                <div className="mb-6 p-6 rounded-2xl relative overflow-hidden bg-gradient-to-r from-brand-600 to-brand-500 shadow-xl transition-all hover:scale-[1.01]">
-                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-blue-300 opacity-10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="relative z-10 text-white">
-                        <div className="flex items-center justify-between mb-6"><h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 opacity-90"><Icon name={icon || "bar-chart-2"} className="w-4 h-4" />{title}</h2></div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 opacity-80"><div className="p-1 rounded bg-white/20"><Icon name="send" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusSent}</span></div><span className="text-2xl lg:text-3xl font-bold">{data.sent.toLocaleString()}</span></div>
-                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 text-green-100"><div className="p-1 rounded bg-green-400/20"><Icon name="check" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusDelivered}</span></div><span className="text-2xl lg:text-3xl font-bold text-green-50">{data.delivered.toLocaleString()}</span></div>
-                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 text-purple-100"><div className="p-1 rounded bg-purple-400/20"><Icon name="check-check" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusRead}</span></div><span className="text-2xl lg:text-3xl font-bold text-purple-50">{data.read.toLocaleString()}</span></div>
-                            <div className="flex flex-col"><div className="flex items-center gap-2 mb-1 text-red-100"><div className="p-1 rounded bg-red-400/20"><Icon name="alert-circle" className="w-3 h-3" /></div><span className="text-xs uppercase tracking-wide">{t.senderStatusError}</span></div><span className="text-2xl lg:text-3xl font-bold text-red-50">{data.error.toLocaleString()}</span></div>
+                <div className="mb-6 p-6 rounded-2xl relative overflow-hidden bg-white shadow-xl transition-all border border-gray-100">
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <Icon name={icon || "bar-chart-2"} className="w-5 h-5 text-brand-600" />{title}
+                            </h2>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                            {statsConfig.map(stat => (
+                                <div key={stat.key} className={`flex flex-col p-4 rounded-xl border ${stat.key === 'total' ? 'bg-gray-50 border-gray-200' : 
+                                    stat.key === 'sent' ? 'bg-blue-50 border-blue-200' : 
+                                    stat.key === 'delivered' ? 'bg-green-50 border-green-200' :
+                                    stat.key === 'read' ? 'bg-purple-50 border-purple-200' :
+                                    stat.key === 'error' ? 'bg-red-50 border-red-200' : 
+                                    'bg-cyan-50 border-cyan-200'}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className={`text-xs font-bold uppercase tracking-wide ${stat.key === 'total' ? 'text-gray-500' : stat.key === 'sent' ? 'text-blue-600' : stat.key === 'delivered' ? 'text-green-600' : stat.key === 'read' ? 'text-purple-600' : stat.key === 'error' ? 'text-red-600' : 'text-cyan-600'}`}>{stat.label}</span>
+                                        <div className={`p-1.5 rounded-full ${stat.key === 'total' ? 'bg-gray-200 text-gray-600' : stat.key === 'sent' ? 'bg-blue-200 text-blue-700' : stat.key === 'delivered' ? 'bg-green-200 text-green-700' : stat.key === 'read' ? 'bg-purple-200 text-purple-700' : stat.key === 'error' ? 'bg-red-200 text-red-700' : 'bg-cyan-200 text-cyan-700'}`}>
+                                            <Icon name={stat.icon} className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                    <span className="text-2xl font-bold text-gray-800">{data[stat.key]?.toLocaleString() || 0}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
             );
         }
 
-        // --- LEADS PAGE SUB-COMPONENTS ---
         function GlobalStats({ history, selectedUser, onUserChange, uniqueUsers, currentUser, t }) {
             const effectiveSelectedUser = currentUser.role === 'admin' ? selectedUser : currentUser.user_name;
             const filteredHistory = useMemo(() => { if (!effectiveSelectedUser) return history; return history.filter(item => (item.user_name || 'Anonymous') === effectiveSelectedUser); }, [history, effectiveSelectedUser]);
             const stats = useMemo(() => { return filteredHistory.reduce((acc, curr) => ({ total: acc.total + (Number(curr.total_rows) || 0), success: acc.success + (Number(curr.success_count) || 0), duplicate: acc.duplicate + (Number(curr.duplicate_count) || 0), exist: acc.exist + (Number(curr.exist_count) || 0), error: acc.error + (Number(curr.error_count) || 0) }), { total: 0, success: 0, duplicate: 0, exist: 0, error: 0 }); }, [filteredHistory]);
-
             return (
                 <div className="mb-8 animate-fade-in w-full">
                     <div className="flex flex-col md:flex-row justify-between items-end mb-4 gap-4">
                         <div className="w-full">
                             <div className="flex justify-between items-end mb-4">
-                                <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2"><Icon name="bar-chart-2" className="w-5 h-5 text-gray-500" />{t.dashboardStats}</h2>
+                                <h2 className="text-lg font-semibold text-brand-600 flex items-center gap-2"><Icon name="bar-chart-2" className="w-5 h-5 text-gray-500" />{t.dashboardStats}</h2>
                                 {currentUser.role === 'admin' && (<div className="flex flex-col gap-1 w-full md:w-auto min-w-[200px]"><label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.filterUser}</label><div className="relative"><select value={selectedUser} onChange={(e) => onUserChange(e.target.value)} className="w-full pl-3 pr-10 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 appearance-none shadow-sm cursor-pointer font-medium"><option value="">{t.allUsers}</option>{uniqueUsers.map(user => (<option key={user} value={user}>{user}</option>))}</select><div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><Icon name="chevron-down" className="w-4 h-4" /></div></div></div>)}
                             </div>
                             <PastelStatsGrid title="" data={stats} icon="" t={t} />
@@ -632,7 +387,7 @@
 
             return (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-                    <div className="flex items-center gap-3 mb-8"><div className="w-1 h-8 bg-brand-500 rounded-full"></div><h2 className="text-lg font-bold text-gray-900">{t.uploadTitle}</h2></div>
+                    <div className="flex items-center gap-3 mb-8"><div className="w-1 h-8 bg-brand-500 rounded-full"></div><h2 className="text-lg font-bold text-brand-600">{t.uploadTitle}</h2></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">{t.labelUser} <span className="text-red-500">*</span></label><div className="relative group"><div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"><Icon name="user" className="w-4 h-4" /></div><input id="userNameInput" type="text" value={userName} readOnly={currentUser.role !== 'admin'} onChange={(e) => setUserName(e.target.value)} placeholder={t.labelUserPlaceholder} className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm outline-none transition-all ${currentUser.role !== 'admin' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-400 focus:border-brand-400'}`} /></div></div>
                         <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">{t.labelCampaign} <span className="text-gray-400 font-normal normal-case">{t.labelCampaignOptional}</span></label><div className="relative group"><div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-500 transition-colors pointer-events-none"><Icon name="flag" className="w-4 h-4" /></div><input id="campaignNameInput" type="text" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder={t.labelCampaignPlaceholder} className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all bg-gray-50 focus:bg-white placeholder-gray-400" /></div></div>
@@ -643,7 +398,7 @@
                     </div>
                 </div>
             );
-        };
+        }
 
         function ProcessingState({ isSearching, t }) {
             return (
@@ -677,79 +432,110 @@
         function HistoryTable({ history, selectedUser, isLoading, onRefresh, currentUser, currentLang, t, onDelete }) {
             const effectiveSelectedUser = currentUser.role === 'admin' ? selectedUser : currentUser.user_name;
             const filteredHistory = useMemo(() => {
-                if (currentUser.role !== 'admin') return history.filter(item => (item.user_name || 'Anonymous') === currentUser.user_name);
-                if (selectedUser) return history.filter(item => (item.user_name || 'Anonymous') === selectedUser);
+                if (currentUser.role !== 'admin') {
+                    return history.filter(item => (item.user_name || 'Anonymous') === currentUser.user_name);
+                }
+                if (selectedUser) {
+                    return history.filter(item => (item.user_name || 'Anonymous') === selectedUser);
+                }
                 return history;
             }, [history, selectedUser, currentUser]);
-            const formatDate = (dateStr) => { if (!dateStr) return '-'; const date = new Date(dateStr); const locale = currentLang === 'en' ? 'en-US' : 'tr-TR'; return date.toLocaleDateString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' }); };
+            
+            const formatDate = (dateStr) => { 
+                if (!dateStr) return '-'; 
+                const date = new Date(dateStr); 
+                const locale = currentLang === 'en' ? 'en-US' : 'tr-TR'; 
+                return date.toLocaleDateString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' }); 
+            };
             const canDelete = (item) => currentUser.role === 'admin' || (item.user_name === currentUser.user_name);
-
+            
             return (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden min-h-[400px]">
-                    <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white"><div className="flex items-center gap-3"><div className="w-1 h-6 bg-brand-600 rounded-full"></div><h3 className="text-lg font-bold text-gray-900">{t.historyTitle}</h3></div><div className="flex items-center gap-3"><span className="text-xs bg-gray-50 text-gray-600 px-3 py-1.5 rounded-full font-bold">{filteredHistory.length} {t.historyRecords}</span><button onClick={onRefresh} className="p-2 bg-gray-50 hover:bg-brand-50 rounded-full text-gray-400 hover:text-brand-500 transition-colors" title={t.refreshTooltip}><Icon name="refresh-cw" className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /></button></div></div>
+                    <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white">
+                        <div className="flex items-center gap-3"><div className="w-1 h-6 bg-brand-600 rounded-full"></div><h3 className="text-lg font-bold text-gray-900">{t.historyTitle}</h3></div>
+                        <div className="flex items-center gap-3"><span className="text-xs bg-gray-50 text-gray-600 px-3 py-1.5 rounded-full font-bold">{filteredHistory.length} {t.historyRecords}</span><button onClick={onRefresh} className="p-2 bg-gray-50 hover:bg-brand-50 rounded-full text-gray-400 hover:text-brand-500 transition-colors" title={t.refreshTooltip}><Icon name="refresh-cw" className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /></button></div>
+                    </div>
                     <div className="overflow-x-auto custom-scroll flex-1">
                         <table className="w-full text-left border-collapse min-w-[1000px]">
                             <thead><tr className="bg-gray-50/50 border-b border-gray-100"><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colFile}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colUserCampaign}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colTotal}</th><th className="px-6 py-4 text-xs font-bold text-green-700 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colSuccess}</th><th className="px-6 py-4 text-xs font-bold text-brand-700 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colExist}</th><th className="px-6 py-4 text-xs font-bold text-orange-600 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colDuplicate}</th><th className="px-6 py-4 text-xs font-bold text-red-600 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colError}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colStatus}</th><th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10">{t.colActions}</th></tr></thead>
                             <tbody className="divide-y divide-gray-100">
-                                {isLoading ? (<tr><td colSpan="9" className="px-6 py-12 text-center text-sm text-gray-500"><div className="flex flex-col items-center justify-center gap-3"><div className="spinner w-6 h-6 border-2"></div><span>{t.historyLoading}</span></div></td></tr>) : filteredHistory.length > 0 ? ( filteredHistory.map((item) => { const cName = item.campaign_name || item['Campaign Name']; return (<tr key={item.id} className="hover:bg-gray-50 transition-colors group"><td className="px-6 py-4"><div className="flex items-center gap-3"><div className="p-2 bg-brand-50 text-brand-600 rounded-lg group-hover:bg-brand-100 transition-colors"><Icon name="file-spreadsheet" className="w-4 h-4" /></div><div><div className="text-sm font-semibold text-gray-900 max-w-[150px] truncate" title={item.file_name}>{item.file_name || t.statusUntitled}</div><div className="text-xs text-gray-400 mt-0.5">{formatDate(item.created_at)}</div></div></div></td><td className="px-6 py-4"><div className="flex flex-col"><div className="flex items-center gap-2 mb-1"><div className="text-gray-300"><Icon name="user" className="w-3 h-3" /></div><span className="text-sm text-gray-600">{item.user_name || t.statusAnon}</span></div>{cName && (<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-brand-50 text-brand-700 w-fit max-w-[150px] truncate" title={cName}>{cName}</span>)}</div></td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-medium">{item.total_rows}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-green-700 text-right font-bold bg-green-50/20">{item.success_count}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-brand-700 text-right font-bold bg-brand-50/20">{item.exist_count || 0}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 text-right font-medium">{item.duplicate_count}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right font-medium">{item.error_count}</td><td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-1 inline-flex items-center gap-1.5 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800`}><span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>{t.statusCompleted}</span></td><td className="px-6 py-4 whitespace-nowrap text-right">{canDelete(item) && (<button onClick={() => onDelete(item)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title={t.deleteBtn}><Icon name="trash-2" className="w-4 h-4" /></button>)}</td></tr>); }) ) : (<tr><td colSpan="9" className="px-6 py-16 text-center text-sm text-gray-500"><div className="flex flex-col items-center gap-3"><div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icon name="inbox" className="w-6 h-6" /></div><div><span className="font-semibold text-gray-600 block">{t.historyEmptyTitle}</span><p className="text-xs text-gray-400 mt-1">{t.historyEmptyDesc}</p></div></div></td></tr>)}
+                                {isLoading ? (
+                                    <tr><td colSpan="9" className="px-6 py-12 text-center text-sm text-gray-500"><div className="flex flex-col items-center justify-center gap-3"><div className="spinner w-6 h-6 border-2"></div><span>{t.historyLoading}</span></div></td></tr>
+                                ) : filteredHistory.length > 0 ? ( 
+                                    filteredHistory.map((item) => { 
+                                        const cName = item.campaign_name || item['Campaign Name']; 
+                                        return (
+                                            <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                                                <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="p-2 bg-brand-50 text-brand-600 rounded-lg group-hover:bg-brand-100 transition-colors"><Icon name="file-spreadsheet" className="w-4 h-4" /></div><div><div className="text-sm font-semibold text-gray-900 max-w-[150px] truncate" title={item.file_name}>{item.file_name || t.statusUntitled}</div><div className="text-xs text-gray-400 mt-0.5">{formatDate(item.created_at)}</div></div></div></td>
+                                                <td className="px-6 py-4"><div className="flex flex-col"><div className="flex items-center gap-2 mb-1"><div className="text-gray-300"><Icon name="user" className="w-3 h-3" /></div><span className="text-sm text-gray-600">{item.user_name || t.statusAnon}</span></div>{cName && (<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-brand-50 text-brand-700 w-fit max-w-[150px] truncate" title={cName}>{cName}</span>)}</div></td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-medium">{item.total_rows}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-700 text-right font-bold bg-green-50/20">{item.success_count}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-700 text-right font-bold bg-brand-50/20">{item.exist_count || 0}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 text-right font-medium">{item.duplicate_count}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right font-medium">{item.error_count}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-1 inline-flex items-center gap-1.5 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800`}><span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>{t.statusCompleted}</span></td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right">{canDelete(item) && (<button onClick={() => onDelete(item)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title={t.deleteBtn}><Icon name="trash-2" className="w-4 h-4" /></button>)}</td>
+                                            </tr>
+                                        ); 
+                                    }) 
+                                ) : (
+                                    <tr><td colSpan="9" className="px-6 py-16 text-center text-sm text-gray-500"><div className="flex flex-col items-center gap-3"><div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icon name="inbox" className="w-6 h-6" /></div><div><span className="font-semibold text-gray-600 block">{t.historyEmptyTitle}</span><p className="text-xs text-gray-400 mt-1">{t.historyEmptyDesc}</p></div></div></td></tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             );
-        };
+        }
 
-        // --- BULK SENDER PAGE ---
-        function BulkSenderPage({ t, setAlert }) {
+        function BulkSenderPage({ t, setAlert, currentUser, uniqueUsers }) {
             const [isSending, setIsSending] = useState(false);
             const [targetCount, setTargetCount] = useState('');
-            const [dailyStats, setDailyStats] = useState({ sent: 0, delivered: 0, read: 0, error: 0 });
-            const [totalStats, setTotalStats] = useState({ sent: 0, delivered: 0, read: 0, error: 0 });
-            const [logs, setLogs] = useState([]);
-            const logEndRef = useRef(null);
-
-            // Robust Date Check
-            const isToday = (dateString) => {
-                if (!dateString) return false;
-                const d = new Date(dateString);
-                const today = new Date();
-                return d.toDateString() === today.toDateString(); 
-            };
+            const [sessionStartTime, setSessionStartTime] = useState(null); 
+            const [dailyStats, setDailyStats] = useState({ sent: 0, delivered: 0, read: 0, error: 0, total: 0 }); 
+            const [totalStats, setTotalStats] = useState({ sent: 0, delivered: 0, read: 0, error: 0, total: 0, replied: 0 }); 
+            const [senderSelectedUser, setSenderSelectedUser] = useState(""); 
+            const [progressData, setProgressData] = useState({ total: 0, elapsed: 0, targetCount: 0 });
+            const [readyCount, setReadyCount] = useState(0); 
+            const [broadcastDates, setBroadcastDates] = useState([]);
+            const [selectedDate, setSelectedDate] = useState('');
+            
+            useEffect(() => {
+                if (currentUser.role !== 'admin') {
+                    setSenderSelectedUser(currentUser.user_name);
+                }
+            }, [currentUser]);
 
             const fetchData = useCallback(async () => {
-                // 1. Fetch recent logs from 'leads' table
-                const { data: logsData, error: logsError } = await supabase
-                    .from(LEADS_TABLE_NAME)
-                    .select('id, phone, last_status, updated, created_at')
-                    .order('updated', { ascending: false })
-                    .limit(20);
-                
-                if (logsData) {
-                    const formatted = logsData.map(log => ({
-                        id: log.id,
-                        phone: log.phone,
-                        status: log.last_status,
-                        time: new Date(log.updated || log.created_at).toLocaleTimeString()
-                    })).reverse();
-                    setLogs(formatted);
-                }
-
-                // 2. Fetch stats from 'leads' table
                 const { data: statsData, error: statsError } = await supabase
                     .from(LEADS_TABLE_NAME)
-                    .select('last_status, broadcast_date');
+                    .select('last_status, broadcast_date, user_name, phone');
+
+                const { data: chatsData, error: chatsError } = await supabase
+                    .from(ACTIVE_CHATS_TABLE)
+                    .select('lead_phone');
 
                 if (statsError) {
                     console.error('Stats fetch error:', statsError);
-                    if (statsError.code === 'PGRST301' || statsData === null) {
-                    }
+                    return;
                 }
 
                 if (statsData) {
-                    const newTotal = { sent: 0, delivered: 0, read: 0, error: 0 };
-                    const newDaily = { sent: 0, delivered: 0, read: 0, error: 0 };
+                    const newTotal = { sent: 0, delivered: 0, read: 0, error: 0, total: 0, replied: 0 };
                     
-                    statsData.forEach(row => {
+                    const filterUser = currentUser.role === 'admin' ? senderSelectedUser : currentUser.user_name;
+                    const filteredData = filterUser ? statsData.filter(d => d.user_name === filterUser) : statsData;
+
+                    const freshCount = filteredData.filter(d => (d.last_status || '').trim() === 'fresh').length;
+                    setReadyCount(freshCount);
+
+                    if (chatsData) {
+                         const activePhones = new Set(chatsData.map(c => c.lead_phone));
+                         const repliedCount = filteredData.filter(l => activePhones.has(l.phone)).length;
+                         newTotal.replied = repliedCount;
+                    }
+
+                    filteredData.forEach(row => {
                         const status = (row.last_status || '').toLowerCase().trim();
                         let key = null;
                         if (status === 'sent') key = 'sent';
@@ -759,36 +545,73 @@
 
                         if (key) {
                             newTotal[key]++;
-                            if (isToday(row.broadcast_date)) {
-                                newDaily[key]++;
-                            }
+                            newTotal.total++; 
                         }
                     });
+                    
+                    // --- LOGIC FOR DATE DROPDOWN & SPECIFIC BATCH STATS ---
+                    const uniqueDates = [...new Set(filteredData.map(d => d.broadcast_date).filter(d => d))].sort().reverse();
+                    setBroadcastDates(uniqueDates);
+
+                    // Determine which date to show stats for
+                    // If user hasn't selected one, default to the latest one
+                    const dateToShow = selectedDate || (uniqueDates.length > 0 ? uniqueDates[0] : null);
+                    
+                    let newDaily = { sent: 0, delivered: 0, read: 0, error: 0, total: 0 };
+
+                    if (dateToShow) {
+                        const batchRows = filteredData.filter(d => d.broadcast_date === dateToShow);
+                        batchRows.forEach(row => {
+                            const status = (row.last_status || '').toLowerCase().trim();
+                            let key = null;
+                            if (status === 'sent') key = 'sent';
+                            else if (status === 'delivered') key = 'delivered';
+                            else if (status === 'read') key = 'read';
+                            else if (status === 'failed') key = 'error';
+
+                            if (key) {
+                                newDaily[key]++;
+                                newDaily.total++; 
+                            }
+                        });
+                    }
 
                     setTotalStats(newTotal);
                     setDailyStats(newDaily);
-                } else if (statsData === null && !statsError) {
-                     setAlert({type: 'error', message: "Veri bulunamadı. Supabase 'leads' tablosunda RLS (Erişim İzni) kapalı olduğundan emin olun."});
                 }
-            }, []); 
+            }, [currentUser, senderSelectedUser, selectedDate]); 
+
+            useEffect(() => {
+                let interval;
+                if (isSending && progressData.total > 0) {
+                    interval = setInterval(() => {
+                        setProgressData(prev => {
+                            const newElapsed = prev.elapsed + 1;
+                            
+                            // SÜRE DOLDU MU KONTROLÜ
+                            if (newElapsed >= prev.total) {
+                                // Süre dolduğunda otomatik durdur ve sıfırla
+                                setTimeout(() => {
+                                    setIsSending(false);
+                                    setProgressData(p => ({ ...p, elapsed: 0, total: 0 }));
+                                }, 500);
+                                
+                                return { ...prev, elapsed: prev.total };
+                            }
+                            
+                            return { ...prev, elapsed: newElapsed };
+                        });
+                    }, 1000); 
+                }
+                return () => clearInterval(interval);
+            }, [isSending, progressData.total]);
 
             useEffect(() => {
                 fetchData(); 
                 const intervalId = setInterval(fetchData, 5000);
-                const channel = supabase
-                    .channel('realtime-leads-update')
-                    .on('postgres_changes', { event: '*', schema: 'public', table: LEADS_TABLE_NAME }, (payload) => {
-                        fetchData();
-                    })
-                    .subscribe();
-
-                return () => {
-                    clearInterval(intervalId);
-                    supabase.removeChannel(channel);
-                };
+                const channel = supabase.channel('realtime-leads-update').on('postgres_changes', { event: '*', schema: 'public', table: LEADS_TABLE_NAME }, () => { fetchData(); }).subscribe();
+                return () => { clearInterval(intervalId); supabase.removeChannel(channel); };
             }, [fetchData]);
-
-            useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
             const startSystem = async () => {
                 if(isSending) return;
@@ -797,134 +620,275 @@
                     return;
                 }
                 
+                const amount = parseInt(targetCount);
+                const totalSeconds = amount * 10;
+                
+                // Reset everything on start
+                setSessionStartTime(new Date().getTime());
+                setProgressData({ total: totalSeconds, elapsed: 0, targetCount: amount });
                 setIsSending(true);
-
-                try {
-                    await fetch(SENDER_WEBHOOK_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'start', batch_limit: parseInt(targetCount) })
-                    });
+                
+                try { 
+                    await fetch(SENDER_WEBHOOK_URL, { 
+                        method: 'POST', 
+                        mode: 'no-cors', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify({ action: 'start', batch_limit: amount }) 
+                    }); 
                 } catch (e) { 
-                    console.error("Webhook Start Error", e);
+                    console.error("Webhook Start Error", e); 
                     setIsSending(false); 
                 }
             };
 
             const stopSystem = async () => {
                 setIsSending(false);
-                try {
-                    await fetch(SENDER_WEBHOOK_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'stop' })
-                    });
-                } catch (e) { console.error("Webhook Stop Error", e); }
-            };
-
-            const getStatusColor = (status) => { 
-                if (!status) return 'text-gray-500';
-                const s = status.toLowerCase();
-                switch(s) { 
-                    case 'sent': return 'text-blue-500'; 
-                    case 'delivered': return 'text-green-500'; 
-                    case 'read': return 'text-purple-500'; 
-                    case 'failed': case 'error': return 'text-red-500'; 
-                    default: return 'text-gray-500'; 
-                } 
-            };
-            const getStatusIcon = (status) => { 
-                if (!status) return 'clock';
-                const s = status.toLowerCase();
-                switch(s) { 
-                    case 'sent': return 'send'; 
-                    case 'delivered': return 'check'; 
-                    case 'read': return 'check-check'; 
-                    case 'failed': case 'error': return 'alert-circle'; 
-                    default: return 'clock'; 
-                } 
+                setProgressData(prev => ({...prev, elapsed: 0, total: 0})); 
+                
+                // Supabase üzerinden action kolonunu 'stop' olarak güncelle
+                try { 
+                    await supabase
+                        .from(SENDER_STATE_TABLE)
+                        .update({ action: 'stop' })
+                        .eq('id', 1) // İlk satırı güncelliyoruz
+                        .select(); 
+                } catch (e) { 
+                    console.error("Supabase Stop State Update Error", e); 
+                }
             };
 
             return (
                 <div className="animate-fade-in w-full pb-8">
-                    <div className="flex justify-between items-end mb-8 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shadow-inner"><Icon name="message-square" className="w-6 h-6" /></div>
-                            <div><h1 className="text-2xl font-bold text-gray-900">{t.senderTitle}</h1><p className="text-sm text-gray-500 font-medium">{t.senderSubtitle}</p></div>
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-8 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm gap-4">
+                        <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shadow-inner"><Icon name="message-square" className="w-6 h-6" /></div><div><h1 className="text-2xl font-bold text-brand-600">{t.senderTitle}</h1><p className="text-sm text-brand-500 font-medium">{t.senderSubtitle}</p></div></div>
+                        {currentUser.role === 'admin' && (<div className="flex flex-col gap-1 w-full md:w-auto min-w-[200px]"><label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.filterUser}</label><div className="relative"><select value={senderSelectedUser} onChange={(e) => setSenderSelectedUser(e.target.value)} className="w-full pl-3 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 appearance-none shadow-sm cursor-pointer font-medium"><option value="">{t.allUsers}</option>{uniqueUsers.map(user => (<option key={user} value={user}>{user}</option>))}</select><div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><Icon name="chevron-down" className="w-4 h-4" /></div></div></div>)}
+                    </div>
+                    
+                    <PremiumStatsBar title={t.senderTotalTitle} data={totalStats} icon="globe" t={t} />
+                    
+                    <div className="border-t border-gray-200 my-6"></div>
+                    
+                    {/* Last Sending Section with Date Selector */}
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-4">
+                        <h2 className="text-lg font-semibold text-brand-600 flex items-center gap-2 mb-2 md:mb-0"><Icon name="calendar" className="w-5 h-5 text-gray-500" />{t.senderDailyTitle}</h2>
+                        <div className="relative w-full md:w-64">
+                             <select 
+                                value={selectedDate} 
+                                onChange={(e) => setSelectedDate(e.target.value)} 
+                                className="w-full pl-3 pr-10 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 appearance-none shadow-sm cursor-pointer font-medium"
+                             >
+                                <option value="">En Son Gönderim</option>
+                                {broadcastDates.map(date => (
+                                    <option key={date} value={date}>{date}</option>
+                                ))}
+                             </select>
+                             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><Icon name="chevron-down" className="w-4 h-4" /></div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 mb-4">
-                        <PremiumStatsBar title={t.senderTotalTitle} data={totalStats} icon="globe" t={t} />
-                        <div className="border-t border-gray-200 my-4"></div>
-                        <PastelStatsGrid title={t.senderDailyTitle} data={dailyStats} icon="calendar" t={t} />
-                    </div>
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                    
+                    <PastelStatsGrid title="" data={dailyStats} icon="" t={t} />
+                    
+                    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden mt-6">
                         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row items-center justify-between gap-4">
-                            <h3 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="activity" className="w-4 h-4 text-brand-600" />{t.senderLogTitle}{isSending && <span className="flex h-3 w-3 relative ml-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>}</h3>
+                            <h3 className="font-bold text-brand-600 flex items-center gap-2"><Icon name="activity" className="w-4 h-4 text-brand-600" />{t.senderLogTitle}{isSending && <span className="flex h-3 w-3 relative ml-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>}</h3>
                             <div className="flex items-center gap-3 w-full md:w-auto">
-                                <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-brand-500 h-9 transition-all hover:border-brand-200">
-                                    <span className="text-gray-500 text-xs font-bold whitespace-nowrap">{t.targetAmount}:</span>
-                                    <input 
-                                        type="number" 
-                                        value={targetCount} 
-                                        onChange={(e) => setTargetCount(e.target.value)} 
-                                        placeholder="∞" 
-                                        className="border-none outline-none text-sm font-semibold w-20 p-0 text-gray-800 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                                        disabled={isSending}
-                                    />
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t.senderReady}:</span>
+                                    <span className="px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 shadow-sm flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                        {readyCount}
+                                    </span>
                                 </div>
-                                {!isSending ? (<button onClick={startSystem} className="px-4 py-1.5 rounded-lg font-bold text-xs text-white bg-brand-600 hover:bg-brand-700 shadow-md transition-all flex items-center gap-1 h-9"><Icon name="play" className="w-3 h-3" /> {t.senderStartBtn}</button>) : (<button onClick={stopSystem} className="px-4 py-1.5 rounded-lg font-bold text-xs text-white bg-red-500 hover:bg-red-600 shadow-md transition-all flex items-center gap-1 h-9"><Icon name="pause" className="w-3 h-3" /> {t.senderStopBtn}</button>)}
+                                <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
+                                <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-brand-500 h-9 transition-all hover:border-brand-200"><span className="text-gray-500 text-xs font-bold whitespace-nowrap">{t.targetAmount}:</span><input type="number" value={targetCount} onChange={(e) => setTargetCount(e.target.value)} placeholder="∞" className="border-none outline-none text-sm font-semibold w-20 p-0 text-gray-800 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSending || currentUser.role !== 'admin'} /></div>
+                                {currentUser.role === 'admin' ? (!isSending ? (<button onClick={startSystem} className="px-4 py-1.5 rounded-lg font-bold text-xs text-white bg-brand-600 hover:bg-brand-700 shadow-md transition-all flex items-center gap-1 h-9"><Icon name="play" className="w-3 h-3" /> {t.senderStartBtn}</button>) : (<button onClick={stopSystem} className="px-4 py-1.5 rounded-lg font-bold text-xs text-white bg-red-500 hover:bg-red-600 shadow-md transition-all flex items-center gap-1 h-9"><Icon name="pause" className="w-3 h-3" /> {t.senderStopBtn}</button>)) : (<div className="px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-bold text-gray-400 flex items-center gap-1 h-9 select-none cursor-not-allowed"><Icon name="lock" className="w-3 h-3" /> Admin Only</div>)}
                             </div>
                         </div>
-                        <div className="h-80 overflow-y-auto p-4 custom-scroll bg-slate-50 space-y-2 font-mono text-sm">
-                            {logs.length === 0 ? (<div className="h-full flex items-center justify-center text-gray-400 italic"><CubeLoader t={t} isSending={isSending} /></div>) : ( logs.map(log => (<div key={log.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 shadow-sm animate-fade-in"><div className="flex items-center gap-3"><span className="text-gray-400 text-xs">[{log.time}]</span><span className="font-medium text-gray-800">{log.phone}</span></div><div className={`flex items-center gap-2 font-bold uppercase text-xs ${getStatusColor(log.status)}`}>{log.status === 'sent' && isSending && <span className="w-3 h-3 border-2 border-current border-l-transparent rounded-full animate-spin"></span>}<span>{t[`senderStatus${(log.status || '').charAt(0).toUpperCase() + (log.status || '').slice(1)}`] || log.status}</span><Icon name={getStatusIcon(log.status)} className="w-4 h-4" /></div></div>)) )}
-                            <div ref={logEndRef} />
+                        <div className="h-96 w-full relative"><SmileLogoAnimation isRunning={isSending} t={t} progressData={isSending ? progressData : null} /></div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- UPDATED MESSAGE BUBBLE COMPONENT ---
+        function MessageBubble({ msg, isOutgoing, onImageClick }) {
+            const isImage = msg.type === 'image' || (msg.media_storage_path && msg.media_storage_path.length > 0);
+            
+            // Supabase Public URL Logic
+            const mediaUrl = msg.media_storage_path 
+                ? `${SUPABASE_URL}/storage/v1/object/public/${msg.media_storage_path}`
+                : (msg.media_url || null);
+            
+            const getStatusIcon = () => {
+                if (!isOutgoing) return null;
+                if (msg.status === 'read') return <span className="flex"><Icon name="check" className="w-3 h-3 text-blue-500 -mr-1" /><Icon name="check" className="w-3 h-3 text-blue-500" /></span>;
+                if (msg.status === 'delivered') return <span className="flex"><Icon name="check" className="w-3 h-3 text-gray-400 -mr-1" /><Icon name="check" className="w-3 h-3 text-gray-400" /></span>;
+                if (msg.status === 'failed') return <Icon name="alert-circle" className="w-3 h-3 text-red-500" />;
+                return <Icon name="check" className="w-3 h-3 text-gray-400" />; 
+            };
+
+            return (
+                <div className={`flex w-full mb-1 ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
+                    <div 
+                        className={`relative max-w-[80%] sm:max-w-[60%] rounded-lg shadow-[0_1px_0.5px_rgba(12,74,110,.05)] text-sm group
+                        ${isOutgoing ? 'bg-chat-outgoing rounded-tr-none msg-tail-out' : 'bg-white rounded-tl-none msg-tail-in'}
+                        `}
+                    >
+                        {isImage && mediaUrl ? (
+                            <div className="p-1 cursor-pointer" onClick={() => onImageClick(mediaUrl)}>
+                                <img 
+                                    src={mediaUrl} 
+                                    alt="Media" 
+                                    className="rounded-lg w-full h-auto max-h-[300px] object-cover hover:opacity-95 transition-opacity bg-gray-100" 
+                                    loading="lazy"
+                                    onError={(e) => {e.target.style.display='none'}}
+                                />
+                                {msg.body && msg.body !== '[Görsel]' && <p className="mt-1 px-1 text-gray-800 break-words">{msg.body}</p>}
+                            </div>
+                        ) : (
+                            <div className="px-2 pt-2 pb-1">
+                                <p className="text-gray-800 break-words leading-relaxed whitespace-pre-wrap">{msg.body}</p>
+                            </div>
+                        )}
+                        
+                        <div className={`flex items-center justify-end gap-1 select-none px-2 pb-1 ${isImage ? 'absolute bottom-1 right-1 bg-black/30 rounded-full px-2 py-0.5 text-white backdrop-blur-sm' : ''}`}>
+                            <span className={`text-[10px] min-w-[30px] text-right ${isImage ? 'text-white/90' : 'text-gray-500'}`}>
+                                {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                            {isOutgoing && (
+                                <span className={isImage ? 'text-white' : ''}>
+                                    {getStatusIcon()}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
             );
-        };
+        }
 
-        // --- MESSENGER PAGE COMPONENT (UPDATED WITH REAL LOGIC) ---
-        function MessengerPage({ t }) {
+        function DateSeparator({ date }) {
+            const dateObj = new Date(date);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            let label = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+            if (dateObj.toDateString() === today.toDateString()) label = "Bugün";
+            else if (dateObj.toDateString() === yesterday.toDateString()) label = "Dün";
+
+            return (
+                <div className="flex justify-center my-4 sticky top-2 z-10">
+                    <span className="bg-brand-50/90 backdrop-blur-sm text-brand-700 text-xs font-medium px-3 py-1 rounded-lg shadow-sm border border-brand-100">
+                        {label}
+                    </span>
+                </div>
+            );
+        }
+
+        // --- UPDATED MESSENGER PAGE COMPONENT ---
+        function MessengerPage({ t, currentUser, uniqueUsers }) {
             const [chatList, setChatList] = useState([]);
             const [selectedChat, setSelectedChat] = useState(null);
             const [chatMessages, setChatMessages] = useState([]);
             const [searchQuery, setSearchQuery] = useState('');
             const [inputMsg, setInputMsg] = useState('');
-            const [isLoadingChats, setIsLoadingChats] = useState(false);
+            const [isLoadingChats, setIsLoadingChats] = useState(true); // Default true only for first load
             const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+            const [selectedUserFilter, setSelectedUserFilter] = useState(""); 
+            const [previewImage, setPreviewImage] = useState(null);
+            const [selectedCategory, setSelectedCategory] = useState("Pending");
             const messagesEndRef = useRef(null);
 
-            // Fetch Active Chats
-            const loadActiveChats = useCallback(async () => {
-                const { data, error } = await supabase
+            // Updated Categories mapped to 'sales_status'
+            // Order: Teklif Bekleyenler -> Sıcak -> İlgili -> Soğuk -> Diğer Açık Sohbetler
+            const categories = [
+                { id: "Pending", label: t.catPending, statuses: ['proposal_requested', 'negotiation'] },
+                { id: "Hot", label: t.catHot, statuses: ['photo_uploaded', 'consultation'] },
+                { id: "Warm", label: t.catWarm, statuses: ['info_only', 'interested', 'warm'] },
+                { id: "Cold", label: t.catCold, statuses: ['closed', 'lost'] },
+                { id: "Open", label: t.catOpen, statuses: [] } // Statuses boş, çünkü "diğerleri" mantığıyla çalışacak
+            ];
+
+            const groupedMessages = useMemo(() => {
+                const groups = {};
+                chatMessages.forEach(msg => {
+                    const date = new Date(msg.created_at).toDateString();
+                    if (!groups[date]) groups[date] = [];
+                    groups[date].push(msg);
+                });
+                return groups;
+            }, [chatMessages]);
+
+            const loadActiveChats = useCallback(async (isBackgroundUpdate = false) => {
+                if (!isBackgroundUpdate) setIsLoadingChats(true);
+                
+                // 1. Fetch all active chats (Raw) - No user filtering here to avoid column error
+                const { data: chatsData, error: chatsError } = await supabase
                     .from(ACTIVE_CHATS_TABLE)
                     .select('*')
                     .order('last_interaction_at', { ascending: false });
 
-                if (!error && data) {
-                    setChatList(data);
-                } else {
-                    console.error("Error loading chats:", error);
+                if (chatsError) {
+                    console.error("Error loading chats:", chatsError);
+                    if (!isBackgroundUpdate) setIsLoadingChats(false);
+                    return;
                 }
-            }, []);
 
-            // Initial Load & Polling for Sidebar
+                // 2. Fetch leads mapping (Phone -> User) to enable filtering in memory
+                // We fetch 'phone' only to be safe about column names and fix previous error
+                const { data: leadsData, error: leadsError } = await supabase
+                    .from(LEADS_TABLE_NAME)
+                    .select('phone, user_name'); 
+
+                if (leadsError) {
+                    console.error("Error loading leads for mapping:", leadsError);
+                    // Fallback: Show all chats if leads mapping fails
+                    setChatList(chatsData); 
+                    if (!isBackgroundUpdate) setIsLoadingChats(false);
+                    return;
+                }
+
+                // 3. Create a Map for O(1) lookup: Phone -> UserName
+                const phoneToUserMap = {};
+                if (leadsData) {
+                    leadsData.forEach(lead => {
+                        // Assuming 'phone' is the main column, if needed check alternates
+                        const p = lead.phone;
+                        if (p && lead.user_name) {
+                            phoneToUserMap[p] = lead.user_name;
+                        }
+                    });
+                }
+
+                // 4. Enrich chats with user_name and Filter locally
+                let enrichedChats = chatsData.map(chat => ({
+                    ...chat,
+                    user_name: phoneToUserMap[chat.lead_phone] || 'Unknown' 
+                }));
+
+                // 5. Apply Filtering Logic based on Role
+                if (currentUser && currentUser.role !== 'admin') {
+                    // Normal User: See only their own chats
+                    enrichedChats = enrichedChats.filter(c => c.user_name === currentUser.user_name);
+                } else if (currentUser && currentUser.role === 'admin' && selectedUserFilter) {
+                    // Admin with Filter: See selected user's chats
+                    enrichedChats = enrichedChats.filter(c => c.user_name === selectedUserFilter);
+                }
+                // Admin without Filter: See all (enrichedChats remains as is)
+
+                setChatList(enrichedChats);
+                if (!isBackgroundUpdate) setIsLoadingChats(false);
+
+            }, [currentUser, selectedUserFilter]);
+
             useEffect(() => {
-                setIsLoadingChats(true);
-                loadActiveChats().finally(() => setIsLoadingChats(false));
+                loadActiveChats(false); // Initial load with spinner
 
-                // Polling for new chats/updates every 5 seconds
-                const interval = setInterval(loadActiveChats, 5000);
-
-                // Realtime subscription for chats
+                const interval = setInterval(() => loadActiveChats(true), 10000); // Background polling
                 const channel = supabase
                     .channel('realtime_chats')
                     .on('postgres_changes', { event: '*', schema: 'public', table: ACTIVE_CHATS_TABLE }, () => {
-                        loadActiveChats();
+                        loadActiveChats(true); // Realtime update, no spinner
                     })
                     .subscribe();
 
@@ -934,7 +898,6 @@
                 };
             }, [loadActiveChats]);
 
-            // Load Messages when Chat Selected
             useEffect(() => {
                 if (!selectedChat) return;
 
@@ -954,11 +917,25 @@
 
                 loadMessages();
 
-                // Realtime subscription for messages
+                // Reset Unread Count Logic
+                if (selectedChat.unread_count > 0) {
+                    setChatList(prev => prev.map(c => c.id === selectedChat.id ? { ...c, unread_count: 0 } : c));
+                    supabase
+                        .from(ACTIVE_CHATS_TABLE)
+                        .update({ unread_count: 0 })
+                        .eq('id', selectedChat.id)
+                        .then(({ error }) => {
+                            if (error) console.error("Read status update error:", error);
+                        });
+                }
+
                 const channel = supabase
                     .channel(`room_${selectedChat.lead_phone}`)
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE, filter: `lead_phone=eq.${selectedChat.lead_phone}` }, (payload) => {
                         setChatMessages(prev => [...prev, payload.new]);
+                    })
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: MESSAGES_TABLE, filter: `lead_phone=eq.${selectedChat.lead_phone}` }, (payload) => {
+                        setChatMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
                     })
                     .subscribe();
 
@@ -967,19 +944,17 @@
                 };
             }, [selectedChat]);
 
-            // Scroll to bottom on new message
             useEffect(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, [chatMessages]);
+            }, [chatMessages, selectedChat]);
 
             const handleSendMessage = async () => {
                 if (!inputMsg.trim() || !selectedChat) return;
 
                 const phone = selectedChat.lead_phone;
                 const message = inputMsg;
-                setInputMsg(''); // Optimistic clear
+                setInputMsg('');
 
-                // Send via Webhook
                 try {
                     const formData = new FormData();
                     formData.append('phone', phone);
@@ -990,8 +965,6 @@
                         mode: 'no-cors',
                         body: formData
                     });
-                    
-                    // Note: Realtime subscription will add the message to the list
                 } catch (error) {
                     console.error("Send error:", error);
                     alert("Mesaj gönderilemedi!");
@@ -1003,56 +976,85 @@
                 const isAIActive = chat.ai_mode === 'active';
                 const newMode = isAIActive ? 'manual' : 'active';
                 
-                // Optimistic UI update
                 setChatList(prev => prev.map(c => c.lead_phone === chat.lead_phone ? { ...c, ai_mode: newMode } : c));
                 if (selectedChat?.lead_phone === chat.lead_phone) {
                     setSelectedChat(prev => ({ ...prev, ai_mode: newMode }));
                 }
 
-                // 1. Update directly via Supabase
-                const { error: dbError } = await supabase
-                    .from(ACTIVE_CHATS_TABLE)
-                    .update({ ai_mode: newMode })
-                    .eq('id', chat.id); 
+                await supabase.from(ACTIVE_CHATS_TABLE).update({ ai_mode: newMode }).eq('id', chat.id);
 
-                if (dbError) {
-                     console.error("Direct DB Update error:", dbError);
-                     // Hata olursa eski haline döndür
-                     loadActiveChats(); 
-                }
-
-                // 2. Also call the Webhook
                 try {
                     const formData = new FormData();
                     formData.append('phone', chat.lead_phone);
                     formData.append('action', newMode === 'active' ? 'enable' : 'disable');
-
-                    await fetch(TOGGLE_AI_WEBHOOK, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        body: formData
-                    });
-                } catch (error) {
-                    console.error("AI Toggle Webhook error:", error);
-                }
+                    await fetch(TOGGLE_AI_WEBHOOK, { method: 'POST', mode: 'no-cors', body: formData });
+                } catch (e) { console.error(e); }
             };
 
-            const filteredChats = chatList.filter(c => 
-                (c.contact_name && c.contact_name.toLowerCase().includes(searchQuery.toLowerCase())) || 
-                (c.lead_phone && c.lead_phone.includes(searchQuery))
-            );
+            const filteredChats = chatList.filter(c => {
+                const matchesSearch = (c.contact_name && c.contact_name.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                                      (c.lead_phone && c.lead_phone.includes(searchQuery));
+                
+                // Kategori Mantığı
+                const chatStatus = c.sales_status; // null olabilir
+
+                // Belirli kategorilere ait statüler
+                const definedStatuses = ['proposal_requested', 'negotiation', 'photo_uploaded', 'consultation', 'info_only', 'interested', 'warm', 'closed', 'lost'];
+                
+                let matchesCategory = false;
+
+                if (selectedCategory === 'Open') {
+                    // Eğer kategori "Open" ise: Tanımlı listelerin DIŞINDA kalanlar
+                    // Yani chatStatus bu listede YOKSA veya null/undefined ise
+                    if (!chatStatus || !definedStatuses.includes(chatStatus)) {
+                        matchesCategory = true;
+                    }
+                } else {
+                    // Diğer kategoriler için normal eşleştirme
+                    const currentStatuses = categories.find(cat => cat.id === selectedCategory)?.statuses || [];
+                    matchesCategory = currentStatuses.includes(chatStatus);
+                }
+
+                return matchesSearch && matchesCategory;
+            });
 
             return (
                 <div className="flex w-full h-full bg-white border-t border-gray-200 animate-fade-in overflow-hidden">
-                    {/* Sidebar */}
-                    <div className={`${selectedChat ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-50/50 border-r border-gray-200 flex-col flex-none`}>
-                        <div className="p-4 border-b border-gray-200 bg-white h-16 flex items-center">
-                            <h2 className="text-lg font-bold text-gray-800 mr-4">{t.foldersTitle}</h2>
-                            <div className="relative flex-1">
+                    <ImageViewer src={previewImage} onClose={() => setPreviewImage(null)} t={t} />
+
+                    <div className={`${selectedChat ? 'hidden md:flex' : 'flex'} w-full md:w-[380px] bg-white border-r border-gray-200 flex-col flex-none z-20`}>
+                        <div className="p-3 bg-white border-b border-gray-100 flex flex-col gap-3">
+                            <div className="flex items-center justify-between px-1">
+                                <h2 className="text-lg font-bold text-gray-800 tracking-tight">{t.foldersTitle}</h2>
+                                <div className="flex gap-2">
+                                     <button className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors"><Icon name="edit" className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+                            
+                            {/* DÜZELTME: Scroll alanı kenarlara taşırıldı (-mx-3) ve içerik hizalandı (px-3) */}
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 w-[calc(100%+1.5rem)] -mx-3 px-3 touch-pan-x scroll-smooth snap-x items-center">
+                                {categories.map(cat => (
+                                    <button 
+                                        key={cat.id}
+                                        onClick={() => setSelectedCategory(cat.id)}
+                                        className={`px-5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 select-none snap-start ${
+                                            selectedCategory === cat.id 
+                                            ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 transform scale-105' 
+                                            : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-100'
+                                        }`}
+                                    >
+                                        {cat.label}
+                                    </button>
+                                ))}
+                                {/* Sağ tarafta son elemanın kenara yapışmaması için tampon boşluk */}
+                                <div className="w-2 flex-shrink-0"></div>
+                            </div>
+
+                            <div className="relative w-full">
                                 <input 
                                     type="text" 
                                     placeholder={t.searchPlaceholder} 
-                                    className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-brand-300 focus:ring-0 rounded-lg text-sm transition-all" 
+                                    className="w-full pl-9 pr-4 py-2 bg-gray-50 border-transparent focus:bg-white focus:border-brand-300 focus:ring-1 focus:ring-brand-300 rounded-lg text-sm transition-all" 
                                     value={searchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)} 
                                 />
@@ -1061,123 +1063,168 @@
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scroll">
                             {isLoadingChats ? (
-                                <div className="flex justify-center p-8"><div className="spinner w-6 h-6 border-2"></div></div>
+                                <div className="flex justify-center p-8"><div className="spinner w-6 h-6 border-2 border-brand-200 border-t-brand-500"></div></div>
                             ) : filteredChats.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-gray-400 p-4 text-center">
-                                    <Icon name="message-square-off" className="w-10 h-10 mb-2 opacity-20" />
-                                    <p className="text-sm">Sohbet bulunamadı.</p>
+                                <div className="flex flex-col items-center justify-center h-full text-gray-400 p-8 text-center">
+                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                                        <Icon name="inbox" className="w-8 h-8 text-gray-300" />
+                                    </div>
+                                    <p className="text-sm font-medium text-gray-500">Bu kategoride sohbet yok.</p>
                                 </div>
                             ) : (
                                 filteredChats.map(chat => (
-                                    <div key={chat.lead_phone} onClick={() => setSelectedChat(chat)} className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-white transition-all relative group ${selectedChat?.lead_phone === chat.lead_phone ? 'bg-white border-l-4 border-l-brand-500 shadow-sm z-10' : 'border-l-4 border-l-transparent'}`}>
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-300 flex items-center justify-center text-gray-600 font-bold text-lg shadow-inner flex-shrink-0">
+                                    <div key={chat.lead_phone} onClick={() => setSelectedChat(chat)} className={`flex items-center gap-3 p-3.5 cursor-pointer hover:bg-brand-50/50 transition-colors border-b border-gray-50 group relative ${selectedChat?.lead_phone === chat.lead_phone ? 'bg-brand-50 border-l-4 border-l-brand-500' : 'border-l-4 border-l-transparent'}`}>
+                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center text-brand-700 font-bold text-lg flex-shrink-0 shadow-sm relative">
                                                 {(chat.contact_name || chat.lead_phone).charAt(0).toUpperCase()}
+                                                {chat.related_campaign && chat.related_campaign !== 'Organik' && (
+                                                    <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-md shadow-sm font-bold border border-white">
+                                                        LEAD
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <h4 className={`font-semibold text-sm truncate ${selectedChat?.lead_phone === chat.lead_phone ? 'text-brand-700' : 'text-gray-800'}`}>
+                                                <div className="flex justify-between items-center mb-0.5">
+                                                    <h4 className={`font-semibold truncate text-sm flex items-center gap-2 ${selectedChat?.lead_phone === chat.lead_phone ? 'text-brand-800' : 'text-gray-800'}`}>
                                                         {chat.contact_name || chat.lead_phone}
+                                                        {chat.related_campaign && chat.related_campaign !== 'Organik' && (
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 font-normal truncate max-w-[80px]">
+                                                                {chat.related_campaign}
+                                                            </span>
+                                                        )}
                                                     </h4>
-                                                    <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">
+                                                    <span className={`text-[10px] whitespace-nowrap ${chat.unread_count > 0 ? 'text-brand-600 font-bold' : 'text-gray-400'}`}>
                                                         {chat.last_interaction_at ? new Date(chat.last_interaction_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-gray-500 truncate">{chat.last_msg_preview || '...'}</p>
-                                                <div className="flex items-center justify-between mt-3" onClick={(e) => e.stopPropagation()}>
-                                                    <div onClick={(e) => handleToggleAI(e, chat)} className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer transition-colors ${chat.ai_mode === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                        <div className={`w-2 h-2 rounded-full ${chat.ai_mode === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                                                        <span className="text-[10px] font-semibold uppercase tracking-wide">{chat.ai_mode === 'active' ? t.modeAuto : t.modeManual}</span>
-                                                    </div>
-                                                    {chat.unread_count > 0 && <span className="bg-brand-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">{chat.unread_count}</span>}
+                                                <div className="flex justify-between items-center">
+                                                    <p className={`text-xs truncate pr-2 ${chat.unread_count > 0 ? 'text-gray-700 font-medium' : 'text-gray-500'}`}>
+                                                        {chat.last_msg_direction === 'outbound' && <span className="text-brand-400 mr-1">siz:</span>}
+                                                        {chat.last_msg_preview && chat.last_msg_preview.includes('[') ? <span className="italic text-brand-500">{chat.last_msg_preview}</span> : (chat.last_msg_preview || '...')}
+                                                    </p>
+                                                    {chat.unread_count > 0 && (
+                                                        <span className="bg-brand-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center flex-shrink-0 shadow-sm animate-pulse">
+                                                            {chat.unread_count}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
+                                            <div onClick={(e) => handleToggleAI(e, chat)} className="absolute bottom-2 right-2 p-1 hover:bg-white rounded-full transition-colors z-10" title={chat.ai_mode === 'active' ? 'AI Devrede' : 'Manuel Mod'}>
+                                                <div className={`w-2 h-2 rounded-full shadow-sm ${chat.ai_mode === 'active' ? 'bg-green-500 shadow-green-200' : 'bg-gray-300'}`}></div>
+                                            </div>
                                     </div>
                                 ))
                             )}
                         </div>
                     </div>
 
-                    {/* Chat Area */}
-                    <div className={`${!selectedChat ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-[#EFEAE2] relative min-w-0`}>
-                        <div className="absolute inset-0 opacity-40 pointer-events-none chat-bg"></div>
+                    <div className={`${!selectedChat ? 'hidden md:flex' : 'flex'} flex-1 flex-col relative min-w-0 bg-[#f0f9ff]`}>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden opacity-[0.03]">
+                            <SmileZoneLogo />
+                        </div>
+                        <div className="absolute inset-0 chat-bg-pattern pointer-events-none z-0 mix-blend-multiply opacity-40"></div>
+                        
                         {selectedChat ? (
                             <>
-                                <div className="h-16 bg-gray-100 border-b border-gray-200 flex items-center px-4 md:px-6 justify-between relative z-10 shadow-sm flex-none">
+                                <div className="h-16 bg-white/90 backdrop-blur border-b border-gray-100 flex items-center px-4 justify-between relative z-10 shadow-sm flex-none">
                                     <div className="flex items-center gap-3">
-                                        <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 -ml-2 text-gray-600"><Icon name="arrow-left" className="w-5 h-5" /></button>
-                                        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-sm">
+                                        <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><Icon name="arrow-left" className="w-5 h-5" /></button>
+                                        <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-sm cursor-pointer shadow-inner border border-brand-200">
                                             {(selectedChat.contact_name || selectedChat.lead_phone).charAt(0).toUpperCase()}
                                         </div>
-                                        <div>
-                                            <h3 className="font-semibold text-gray-800">{selectedChat.contact_name || selectedChat.lead_phone}</h3>
-                                            <p className="text-xs text-gray-500">{selectedChat.lead_phone}</p>
+                                        <div className="flex flex-col cursor-pointer">
+                                            <h3 className="font-bold text-gray-800 leading-tight text-sm flex items-center gap-2">
+                                                {selectedChat.contact_name || selectedChat.lead_phone}
+                                                {selectedChat.related_campaign && selectedChat.related_campaign !== 'Organik' && (
+                                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded border border-blue-200">LEAD</span>
+                                                )}
+                                            </h3>
+                                            <p className="text-xs text-brand-500 font-medium">{selectedChat.lead_phone}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold ${selectedChat.ai_mode === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-                                            <Icon name={selectedChat.ai_mode === 'active' ? 'zap' : 'user'} className="w-3 h-3" />
-                                            {selectedChat.ai_mode === 'active' ? 'AI ON' : 'AI OFF'}
+                                        <div onClick={(e) => handleToggleAI(e, selectedChat)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all border shadow-sm ${selectedChat.ai_mode === 'active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                                            <Icon name="bot" className="w-3.5 h-3.5" />
+                                            {selectedChat.ai_mode === 'active' ? 'AI AUTO' : 'AI OFF'}
                                         </div>
+                                        <button className="text-gray-400 hover:text-brand-600 hover:bg-brand-50 p-2 rounded-full transition-colors"><Icon name="more-vertical" className="w-5 h-5" /></button>
                                     </div>
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scroll relative z-10">
+                                <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-1 custom-scroll relative z-10">
                                     {isLoadingMessages ? (
-                                        <div className="flex justify-center p-4"><div className="spinner w-8 h-8 border-2"></div></div>
+                                        <div className="flex justify-center p-4"><div className="spinner w-8 h-8 border-2 border-brand-300 border-t-brand-600"></div></div>
                                     ) : (
-                                        chatMessages.map((msg, index) => {
-                                            const isOutgoing = msg.direction === 'outbound';
-                                            return (
-                                                <div key={msg.id || index} className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
-                                                    <div className={`max-w-[85%] md:max-w-[70%] p-3 rounded-lg shadow-sm text-sm relative ${isOutgoing ? 'bg-[#D9FDD3] text-gray-800 rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'}`}>
-                                                        {msg.body}
-                                                        <span className="text-[10px] text-gray-400 block text-right mt-1 flex items-center justify-end gap-1">
-                                                            {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                                            {isOutgoing && <Icon name="check-check" className={`w-3 h-3 ${msg.status === 'read' ? 'text-blue-500' : 'text-gray-400'}`} />}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
+                                        Object.keys(groupedMessages).map(date => (
+                                            <React.Fragment key={date}>
+                                                <DateSeparator date={date} />
+                                                {groupedMessages[date].map((msg, index) => (
+                                                    <MessageBubble 
+                                                        key={msg.id || index} 
+                                                        msg={msg} 
+                                                        isOutgoing={msg.direction === 'outbound'} 
+                                                        onImageClick={setPreviewImage} 
+                                                    />
+                                                ))}
+                                            </React.Fragment>
+                                        ))
                                     )}
-                                    <div ref={messagesEndRef} />
+                                    <div ref={messagesEndRef} className="h-4" />
                                 </div>
 
-                                <div className="p-3 md:p-4 bg-gray-100 border-t border-gray-200 relative z-10 flex items-center gap-2 md:gap-3 flex-none">
-                                    <button className="p-2 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"><Icon name="smile" className="w-6 h-6" /></button>
-                                    <button className="p-2 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"><Icon name="paperclip" className="w-6 h-6" /></button>
-                                    <input 
-                                        type="text" 
-                                        className="flex-1 py-3 px-4 rounded-lg border border-gray-300 focus:outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-400 transition-all bg-white" 
-                                        placeholder={t.typeMessage} 
-                                        value={inputMsg} 
-                                        onChange={(e) => setInputMsg(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                    />
-                                    {inputMsg ? (
-                                        <button onClick={handleSendMessage} className="p-3 bg-brand-600 text-white rounded-full hover:bg-brand-700 transition-colors shadow-md transform active:scale-95"><Icon name="send" className="w-5 h-5" /></button>
-                                    ) : (
-                                        <button className="p-3 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"><Icon name="mic" className="w-6 h-6" /></button>
-                                    )}
+                                <div className="p-4 relative z-20">
+                                    <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-end p-2 gap-2 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+                                        <button className="p-3 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors flex-shrink-0">
+                                            <Icon name="plus" className="w-6 h-6" />
+                                        </button>
+                                        
+                                        <div className="flex-1 flex items-center py-3">
+                                            <input 
+                                                type="text" 
+                                                className="w-full border-none focus:ring-0 p-0 text-gray-800 placeholder-gray-400 bg-transparent text-sm font-medium" 
+                                                placeholder={t.typeMessage} 
+                                                value={inputMsg} 
+                                                onChange={(e) => setInputMsg(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center gap-1 pr-1 pb-1.5">
+                                             <button className="p-2 text-gray-400 hover:text-brand-500 transition-colors rounded-full hover:bg-gray-50"><Icon name="smile" className="w-5 h-5" /></button>
+                                             <button className="p-2 text-gray-400 hover:text-brand-500 transition-colors rounded-full hover:bg-gray-50"><Icon name="camera" className="w-5 h-5" /></button>
+                                             
+                                             {inputMsg.trim() ? (
+                                                <button onClick={handleSendMessage} className="ml-2 p-3 bg-brand-600 text-white rounded-full hover:bg-brand-700 transition-all active:scale-95 shadow-lg shadow-brand-500/30 flex items-center justify-center">
+                                                    <Icon name="send" className="w-5 h-5 ml-0.5" />
+                                                </button>
+                                             ) : (
+                                                <button className="ml-2 p-3 bg-gray-100 text-gray-400 rounded-full hover:bg-brand-50 hover:text-brand-500 transition-all">
+                                                    <Icon name="mic" className="w-5 h-5" />
+                                                </button>
+                                             )}
+                                        </div>
+                                    </div>
+                                    <div className="text-center mt-2">
+                                        <p className="text-[10px] text-gray-300 font-medium">Smile Zone Secured Chat</p>
+                                    </div>
                                 </div>
                             </>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 relative z-10">
-                                <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center mb-6 opacity-50"><Icon name="message-circle" className="w-16 h-16 text-gray-400" /></div>
-                                <h3 className="text-xl font-bold text-gray-600 mb-2">{t.selectChat}</h3>
-                                <p className="text-sm text-gray-400 max-w-xs text-center">{t.selectChatDesc}</p>
-                                <div className="mt-8 border-t border-gray-300 w-12"></div>
-                                <p className="text-xs mt-4 text-gray-400 font-semibold uppercase tracking-widest">Smile Zone Messenger</p>
+                            <div className="flex-1 flex flex-col items-center justify-center text-brand-300 relative z-10 select-none">
+                                <div className="w-40 h-40 bg-brand-50 rounded-full flex items-center justify-center mb-6 opacity-80 shadow-inner">
+                                    <Icon name="message-square" className="w-20 h-20 text-brand-200" />
+                                </div>
+                                <h3 className="text-2xl font-light text-brand-700 mb-2">Smile Zone Messenger</h3>
+                                <p className="text-sm text-brand-400 max-w-xs text-center">Görüşmeleri yönetmek için soldan bir sohbet seçin.</p>
+                                <div className="mt-8 flex items-center gap-2 text-xs text-brand-300">
+                                    <Icon name="lock" className="w-3 h-3" /> Uçtan uca şifreli (Demo)
+                                </div>
                             </div>
                         )}
                     </div>
                 </div>
             );
-        };
+        }
 
-        // --- APP COMPONENT ---
         function App() {
             const [language, setLanguage] = useState('tr');
             const [currentUser, setCurrentUser] = useState(null);
@@ -1285,19 +1332,18 @@
                     <Sidebar currentUser={currentUser} onLogout={handleLogout} t={t} activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
                     
                     <main className={`flex-1 md:ml-64 transition-all duration-300 bg-[#F8FAFC] flex flex-col ${!currentUser ? 'blur-content' : ''} ${isAppMode ? 'h-full overflow-hidden' : 'min-h-screen p-6 md:p-10 overflow-y-auto'}`}>
-                        {/* HEADER (Only for non-messenger pages) */}
                         {activeMenu !== 'messenger' && (
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 flex-none">
                                 <div>
                                     {activeMenu === 'leads' && (
                                         <>
-                                            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{t.pageTitle}</h1>
-                                            <p className="text-sm text-gray-500 mt-1">{t.pageSubtitle}</p>
+                                            <h1 className="text-3xl font-bold text-brand-600 tracking-tight">{t.pageTitle}</h1>
+                                            <p className="text-sm text-brand-500 mt-1">{t.pageSubtitle}</p>
                                         </>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <button onClick={toggleLanguage} className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-all shadow-sm flex items-center gap-2" title="Dili Değiştir / Change Language"><Icon name="globe" className="w-4 h-4" />{language === 'tr' ? 'EN' : 'TR'}</button>
+                                    <button onClick={toggleLanguage} className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:text-brand-600 hover:border-brand-200 transition-all shadow-sm flex items-center gap-2"><Icon name="globe" className="w-4 h-4" />{language === 'tr' ? 'EN' : 'TR'}</button>
                                     {activeMenu === 'leads' && viewState === 'idle' && (
                                         <button onClick={handleDownloadTemplate} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm"><Icon name="download" className="w-4 h-4" />{t.downloadTemplate}</button>
                                     )}
@@ -1334,12 +1380,12 @@
                                 )}
 
                                 {activeMenu === 'sender' && (
-                                    <BulkSenderPage t={t} setAlert={setAlert} />
+                                    <BulkSenderPage t={t} setAlert={setAlert} currentUser={currentUser} uniqueUsers={uniqueUsers} />
                                 )}
 
                                 {activeMenu === 'messenger' && (
                                     <div className="flex-1 h-full w-full overflow-hidden">
-                                        <MessengerPage t={t} />
+                                        <MessengerPage t={t} currentUser={currentUser} uniqueUsers={uniqueUsers} />
                                     </div>
                                 )}
                             </>
@@ -1347,9 +1393,10 @@
                     </main>
                 </div>
             );
-        };
+        }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
         root.render(<App />);
     </script>
 </body>
