@@ -522,7 +522,8 @@
             const fetchData = useCallback(async () => {
                 const { data: statsData, error: statsError } = await supabase
                     .from(LEADS_TABLE_NAME)
-                    .select('last_status, broadcast_date, user_name, phone');
+                    .select('last_status, broadcast_date, user_name, phone')
+		    .range(0, 99999);
 
                 const { data: chatsData, error: chatsError } = await supabase
                     .from(ACTIVE_CHATS_TABLE)
@@ -724,60 +725,103 @@
         }
 
         // --- UPDATED MESSAGE BUBBLE COMPONENT ---
-        function MessageBubble({ msg, isOutgoing, onImageClick }) {
-            const isImage = msg.type === 'image' || (msg.media_storage_path && msg.media_storage_path.length > 0);
-            
-            // Supabase Public URL Logic
-            const mediaUrl = msg.media_storage_path 
-                ? `${SUPABASE_URL}/storage/v1/object/public/${msg.media_storage_path}`
-                : (msg.media_url || null);
-            
-            const getStatusIcon = () => {
-                if (!isOutgoing) return null;
-                if (msg.status === 'read') return <span className="flex"><Icon name="check" className="w-3 h-3 text-blue-500 -mr-1" /><Icon name="check" className="w-3 h-3 text-blue-500" /></span>;
-                if (msg.status === 'delivered') return <span className="flex"><Icon name="check" className="w-3 h-3 text-gray-400 -mr-1" /><Icon name="check" className="w-3 h-3 text-gray-400" /></span>;
-                if (msg.status === 'failed') return <Icon name="alert-circle" className="w-3 h-3 text-red-500" />;
-                return <Icon name="check" className="w-3 h-3 text-gray-400" />; 
-            };
+       function MessageBubble({ msg, isOutgoing, onImageClick }) {
+    // 1. Medya URL Hazırlığı
+    const mediaUrl = msg.media_storage_path 
+        ? `${SUPABASE_URL}/storage/v1/object/public/${msg.media_storage_path}`
+        : (msg.media_url || null);
 
-            return (
-                <div className={`flex w-full mb-1 ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
-                    <div 
-                        className={`relative max-w-[80%] sm:max-w-[60%] rounded-lg shadow-[0_1px_0.5px_rgba(12,74,110,.05)] text-sm group
-                        ${isOutgoing ? 'bg-chat-outgoing rounded-tr-none msg-tail-out' : 'bg-white rounded-tl-none msg-tail-in'}
-                        `}
-                    >
-                        {isImage && mediaUrl ? (
-                            <div className="p-1 cursor-pointer" onClick={() => onImageClick(mediaUrl)}>
-                                <img 
-                                    src={mediaUrl} 
-                                    alt="Media" 
-                                    className="rounded-lg w-full h-auto max-h-[300px] object-cover hover:opacity-95 transition-opacity bg-gray-100" 
-                                    loading="lazy"
-                                    onError={(e) => {e.target.style.display='none'}}
-                                />
-                                {msg.body && msg.body !== '[Görsel]' && <p className="mt-1 px-1 text-gray-800 break-words">{msg.body}</p>}
-                            </div>
-                        ) : (
-                            <div className="px-2 pt-2 pb-1">
-                                <p className="text-gray-800 break-words leading-relaxed whitespace-pre-wrap">{msg.body}</p>
-                            </div>
-                        )}
-                        
-                        <div className={`flex items-center justify-end gap-1 select-none px-2 pb-1 ${isImage ? 'absolute bottom-1 right-1 bg-black/30 rounded-full px-2 py-0.5 text-white backdrop-blur-sm' : ''}`}>
-                            <span className={`text-[10px] min-w-[30px] text-right ${isImage ? 'text-white/90' : 'text-gray-500'}`}>
-                                {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </span>
-                            {isOutgoing && (
-                                <span className={isImage ? 'text-white' : ''}>
-                                    {getStatusIcon()}
-                                </span>
+    // 2. KONTROLLER
+    // Kullanıcının isteği: Sadece type 'audio' ise ses muamelesi yap.
+    const isAudio = msg.type === 'audio';
+
+    // Görsel kontrolü (Ses değilse ve resim uzantısı varsa veya type image ise)
+    const isImage = !isAudio && mediaUrl && (msg.type === 'image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(mediaUrl));
+
+    // Saat Çakışma Kontrolü: 
+    // Sadece "Metinsiz Saf Resim" ise saat resmin üzerine biner.
+    // Ses dosyası veya metin varsa saat aşağıya iner.
+    const isTimeOverlay = isImage && !msg.body;
+
+    const getStatusIcon = () => {
+        if (!isOutgoing) return null;
+        if (msg.status === 'read') return <span className="flex"><Icon name="check" className="w-3 h-3 text-blue-500 -mr-1" /><Icon name="check" className="w-3 h-3 text-blue-500" /></span>;
+        if (msg.status === 'delivered') return <span className="flex"><Icon name="check" className="w-3 h-3 text-gray-400 -mr-1" /><Icon name="check" className="w-3 h-3 text-gray-400" /></span>;
+        if (msg.status === 'failed') return <Icon name="alert-circle" className="w-3 h-3 text-red-500" />;
+        return <Icon name="check" className="w-3 h-3 text-gray-400" />; 
+    };
+
+    return (
+        <div className={`flex w-full mb-2 ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
+            <div 
+                className={`relative max-w-[85%] sm:max-w-[70%] rounded-xl shadow-sm text-sm group overflow-hidden border border-transparent
+                ${isOutgoing ? 'bg-[#e0f2fe] rounded-tr-none border-blue-50' : 'bg-white rounded-tl-none border-gray-100'}
+                `}
+            >
+                {/* --- GÖRSEL ALANI --- */}
+                {isImage && (
+                    <div className="p-1 cursor-pointer" onClick={() => onImageClick(mediaUrl)}>
+                        <img 
+                            src={mediaUrl} 
+                            alt="Media" 
+                            className="rounded-lg w-full h-auto max-h-[300px] object-cover bg-gray-100" 
+                            loading="lazy"
+                            onError={(e) => {e.target.style.display='none'}}
+                        />
+                    </div>
+                )}
+
+                {/* --- SES DOSYASI ALANI (ÖZEL İSTEK) --- */}
+                {/* Type audio ise: İkon ve tırnak içinde body metni */}
+                {isAudio ? (
+                    <div className="px-3 pt-3 pb-1 flex items-start gap-3">
+                        <div className="mt-0.5 w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 flex-shrink-0">
+                            <Icon name="mic" className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col">
+                            {/* Metni tırnak içinde ve italik gösteriyoruz */}
+                            <p className="text-gray-800 break-words whitespace-pre-wrap leading-relaxed italic">
+                                "{msg.body}"
+                            </p>
+                            {/* İsteğe bağlı: Ses dosyasını dinlemek için link (gerekirse kaldırabilirsin) */}
+                            {mediaUrl && (
+                                <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-500 font-medium mt-1 hover:underline">
+                                    Ses Kaydını Aç
+                                </a>
                             )}
                         </div>
                     </div>
+                ) : (
+                    /* --- NORMAL METİN ALANI --- */
+                    /* Ses değilse ve metin varsa burası çalışır */
+                    msg.body && (msg.body !== '[Görsel]' || !isImage) && (
+                        <div className={`px-3 pt-2 ${isTimeOverlay ? 'pb-8' : 'pb-1'}`}>
+                            <p className="text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
+                                {msg.body}
+                            </p>
+                        </div>
+                    )
+                )}
+                
+                {/* --- SAAT VE TİK ALANI --- */}
+                <div className={`flex items-center justify-end gap-1 select-none px-2 pb-1.5
+                    ${isTimeOverlay 
+                        ? 'absolute bottom-1 right-1 bg-black/30 rounded-full px-2 py-0.5 text-white backdrop-blur-sm' 
+                        : 'text-gray-400 mt-0.5' 
+                    }`}>
+                    <span className={`text-[10px] min-w-[30px] text-right ${isTimeOverlay ? 'text-white/90' : ''}`}>
+                        {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </span>
+                    {isOutgoing && (
+                        <span className={isTimeOverlay ? 'text-white' : ''}>
+                            {getStatusIcon()}
+                        </span>
+                    )}
                 </div>
-            );
-        }
+            </div>
+        </div>
+    );
+}
 
         // --- UPDATED DATE SEPARATOR (NO STICKY) ---
         function DateSeparator({ date }) {
